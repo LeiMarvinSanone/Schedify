@@ -1,0 +1,15 @@
+{
+  "name": "local",
+  "values": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "enabled": true
+    },
+    {
+      "key": "auth_token",
+      "value": "4d6359deb1266ae4c1b9350eff8c4e80",
+      "enabled": true
+    }
+  ]
+}
