@@ -1,0 +1,327 @@
+.home-dashboard {
+  box-sizing: border-box;
+}
+
+.dashboard-title {
+  color: #f0f1f4;
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  align-items: center;
+}
+
+/* Create New Button */
+.create-new-btn {
+  width: 100%;
+  background-color: #5a6778;
+  color: #e2e8f0;
+  border: none;
+  padding: 14px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-bottom: 1rem;
+  text-align: left;
+}
+
+.create-new-btn:hover {
+  background-color: #667086;
+}
+
+/* Schedule List */
+.schedule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 1.5rem;
+}
+
+.schedule-item {
+  background-color: #5a6778;
+  color: #ffffff;
+  padding: 14px 16px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.schedule-item:hover {
+  background-color: #667086;
+  transform: translateX(4px);
+}
+
+.schedule-name {
+  font-size: 0.95rem;
+}
+
+/* Day Selector */
+.day-section {
+  margin-bottom: 1.5rem;
+}
+
+.section-title {
+  color: #F3F4F6;
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.8rem;
+}
+
+.day-selector {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.day-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e0;
+  background-color: #ffffff;
+  color: #4a5568;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.day-btn:hover {
+  background-color: #f1f5f9;
+  border-color: #a0aec0;
+}
+
+.day-btn.active {
+  background-color: #667eea;
+  color: #ffffff;
+  border-color: #667eea;
+  transform: scale(1.05);
+}
+
+.day-btn.has-schedules {
+  position: relative;
+}
+
+.day-indicator {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background-color: #7fb069;
+  border-radius: 50%;
+  border: 1px solid #4a5568;
+}
+
+/* Reminders Section */
+.reminders-section {
+  margin-bottom: 1rem;
+}
+
+.reminder-card {
+  background-color: #4a5568;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 1rem;
+}
+
+.reminder-info {
+  margin-bottom: 1rem;
+}
+
+.reminder-class {
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.reminder-time {
+  color: #cbd5e0;
+  font-size: 0.85rem;
+  margin-bottom: 0.2rem;
+}
+
+.reminder-time-value {
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+/* Alarm Toggle */
+.reminder-alarm {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.alarm-text {
+  color: #e2e8f0;
+  font-size: 0.9rem;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 26px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #cbd5e0;
+  transition: 0.3s;
+  border-radius: 26px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: #7fb069;
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(24px);
+}
+
+/* Day-Specific View Modal */
+.day-view-modal {
+  background-color: #374151;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 1rem;
+  border: 1px solid #4b5563;
+}
+
+.day-view-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #4b5563;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: #e2e8f0;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.back-btn:hover {
+  background-color: #4b5563;
+}
+
+.day-view-title {
+  color: #f3f4f6;
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.day-schedules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.day-schedule-item {
+  background-color: #4a5568;
+  border-radius: 8px;
+  padding: 16px;
+  border-left: 4px solid #667eea;
+}
+
+.schedule-title {
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+}
+
+.schedule-details {
+  color: #cbd5e0;
+  font-size: 0.9rem;
+  margin: 0 0 0.75rem 0;
+}
+
+.schedule-alarms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.alarm-chip {
+  background-color: #5a6778;
+  color: #e2e8f0;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.no-schedules {
+  color: #9ca3af;
+  text-align: center;
+  padding: 2rem;
+  font-style: italic;
+}
+
+/* Reminder Alarms */
+.reminder-alarms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 0.5rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .home-dashboard {
+    padding: 16px;
+  }
+
+  .dashboard-title {
+    font-size: 1.6rem;
+  }
+
+  .day-view-modal {
+    padding: 16px;
+  }
+
+  .day-view-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}

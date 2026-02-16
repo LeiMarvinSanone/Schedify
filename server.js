@@ -2,15 +2,22 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
 require('dotenv').config();
 const mongoose = require('mongoose');
 
 const Student = require('./models/student');
 const Class = require('./models/class');
+const schedulesRouter = require('./routes/schedules');
 
 const app = express();
 
 app.use(express.json());
+
+// Mount schedules router
+app.use('/api/schedules', schedulesRouter);
 
 // Serve Thunder Client files statically and provide download endpoints
 app.use('/thunder', express.static(path.join(__dirname, '.thunder')));
@@ -47,7 +54,7 @@ function saveAuthTokenToEnvironment(token) {
 
 // Connect to MongoDB
 const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/schedule_db';
-mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true })
+mongoose.connect(mongoUri)
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err.message));
 
@@ -67,34 +74,114 @@ app.post('/students', async (req, res) => {
   }
 });
 
-// Auth: signup - create student and return token
+// Email transporter
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
+});
+
+// Auth: signup - create student and send verification email
 app.post('/auth/signup', async (req, res) => {
   try {
-    const { name, email, phone } = req.body;
-    if (!name || !email || !phone) return res.status(400).json({ message: 'Name, email, and phone are required' });
+    const { name, email, password } = req.body;
+    if (!name || !email || !password) return res.status(400).json({ message: 'Name, email, and password are required' });
+
     const existing = await Student.findOne({ email });
     if (existing) return res.status(409).json({ message: 'Email already registered' });
-    const student = await Student.create({ name, email, phone });
-    const token = crypto.randomBytes(16).toString('hex');
-    tokens[token] = student._id.toString();
-    saveAuthTokenToEnvironment(token);
-    res.status(201).json({ student, token });
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+
+    const student = await Student.create({
+      name,
+      email,
+      password: hashedPassword,
+      verificationToken,
+      verificationTokenExpires: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
+    });
+
+    // Send verification email
+    const verificationUrl = `http://localhost:5173/verify-email?token=${verificationToken}`;
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Verify your Schedify account',
+      html: `
+        <h2>Welcome to Schedify, ${name}!</h2>
+        <p>Please verify your email by clicking the link below:</p>
+        <a href="${verificationUrl}">Verify Email</a>
+        <p>This link will expire in 24 hours.</p>
+      `
+    });
+
+    res.status(201).json({ message: 'Verification email sent. Please check your email.' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// Auth: login - simple email+phone lookup, returns token
+// Auth: verify email
+app.get('/auth/verify-email', async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token) return res.status(400).json({ message: 'Verification token is required' });
+
+    const student = await Student.findOne({
+      verificationToken: token,
+      verificationTokenExpires: { $gt: Date.now() }
+    });
+
+    if (!student) {
+      return res.status(400).json({ message: 'Invalid or expired verification token' });
+    }
+
+    // Mark email as verified
+    student.emailVerified = true;
+    student.verificationToken = undefined;
+    student.verificationTokenExpires = undefined;
+    await student.save();
+
+    res.json({ message: 'Email verified successfully! You can now log in.' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Auth: login - email and password with verification check
 app.post('/auth/login', async (req, res) => {
   try {
-    const { email, phone } = req.body;
-    if (!email || !phone) return res.status(400).json({ message: 'Email and phone are required' });
-    const student = await Student.findOne({ email, phone });
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ message: 'Email and password are required' });
+
+    const student = await Student.findOne({ email });
     if (!student) return res.status(401).json({ message: 'Invalid credentials' });
-    const token = crypto.randomBytes(16).toString('hex');
+
+    // Check if email is verified
+    if (!student.emailVerified) {
+      return res.status(401).json({ message: 'Please verify your email before logging in' });
+    }
+
+    // Check password
+    const isValidPassword = await bcrypt.compare(password, student.password);
+    if (!isValidPassword) return res.status(401).json({ message: 'Invalid credentials' });
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { studentId: student._id, email: student.email },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '7d' }
+    );
+
     tokens[token] = student._id.toString();
     saveAuthTokenToEnvironment(token);
-    res.json({ token });
+
+    res.json({ token, student: { _id: student._id, name: student.name, email: student.email } });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -128,7 +215,7 @@ function isValidDateFormat(date) {
 // POST create new class
 app.post('/classes', authenticateToken, async (req, res) => {
   try {
-    const { studentId, title, professor, date, time, room, building, day } = req.body;
+    const { studentId, title, professor, date, time, room, building, day, alarms } = req.body;
     if (!studentId || !title || !professor || !date || !time || !room || !building) {
       return res.status(400).json({ message: 'StudentId, title, professor, date, time, room, and building are required' });
     }
@@ -140,7 +227,17 @@ app.post('/classes', authenticateToken, async (req, res) => {
       return res.status(403).json({ message: 'Forbidden: cannot create class for another student' });
     }
 
-    const newClass = await Class.create({ studentId, title, professor, date, time, room, building, day: day || 'Not specified' });
+    const newClass = await Class.create({
+      studentId,
+      title,
+      professor,
+      date,
+      time,
+      room,
+      building,
+      day: day || 'Not specified',
+      alarms: alarms || [30, 15, 5] // default to all three alarms
+    });
     res.status(201).json(newClass);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -246,18 +343,23 @@ async function checkForUpcomingClasses() {
     const now = new Date();
     const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
 
-    const pending = await Class.find({ notificationSent: false });
-    for (const classItem of pending) {
+    const allClasses = await Class.find({});
+    for (const classItem of allClasses) {
       const [classHour, classMin] = classItem.time.split(':');
       const [currentHour, currentMin] = currentTime.split(':');
       const classTimeInMinutes = parseInt(classHour) * 60 + parseInt(classMin);
       const currentTimeInMinutes = parseInt(currentHour) * 60 + parseInt(currentMin);
       const minutesUntilClass = classTimeInMinutes - currentTimeInMinutes;
-      if (minutesUntilClass > 0 && minutesUntilClass <= 15) {
-        const student = await Student.findById(classItem.studentId).lean();
-        console.log(`🔔 NOTIFICATION: ${student?.name}, your ${classItem.title} class with ${classItem.professor} starts in ${minutesUntilClass} minutes! Room: ${classItem.room}, Building: ${classItem.building}`);
-        classItem.notificationSent = true;
-        await classItem.save();
+
+      // Check each alarm time
+      for (const alarmMinutes of classItem.alarms) {
+        if (minutesUntilClass > 0 && minutesUntilClass <= alarmMinutes && !classItem.notificationsSent.includes(alarmMinutes)) {
+          const student = await Student.findById(classItem.studentId).lean();
+          console.log(`🔔 ALARM: ${student?.name}, your ${classItem.title} class with ${classItem.professor} starts in ${alarmMinutes} minutes! Room: ${classItem.room}, Building: ${classItem.building}`);
+          classItem.notificationsSent.push(alarmMinutes);
+          await classItem.save();
+          break; // Only send one notification per check cycle
+        }
       }
     }
   } catch (err) {

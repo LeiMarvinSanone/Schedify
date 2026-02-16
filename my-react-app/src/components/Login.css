@@ -1,0 +1,160 @@
+.login-container {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #4a5568 0%, #2d3748 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.login-content {
+  text-align: center;
+  max-width: 400px;
+  width: 100%;
+  animation: slideUp 0.6s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.logo-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.app-logo {
+  width: 120px;
+  height: 120px;
+}
+
+.login-title {
+  color: #ffffff;
+  font-size: 2rem;
+  font-weight: 400;
+  margin-bottom: 2rem;
+  letter-spacing: 0.05em;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-group {
+  text-align: left;
+}
+
+.form-label {
+  display: block;
+  color: #ffffff !important;
+  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  opacity: 1 !important;
+}
+
+.form-input {
+  width: 100%;
+  padding: 14px 16px;
+  background-color: #5a6778;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.form-input::placeholder {
+  color: #a0aec0;
+}
+
+.form-input:focus {
+  outline: none;
+  background-color: #667086;
+  border-color: #90cdf4;
+}
+
+.form-input.error {
+  border-color: #fc8181;
+}
+
+.error-message {
+  display: block;
+  color: #fc8181;
+  font-size: 0.85rem;
+  margin-top: 0.4rem;
+}
+
+.create-account-link {
+  background: none;
+  border: none;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0.5rem;
+  margin-top: 0.5rem;
+  transition: color 0.3s ease;
+}
+
+.create-account-link:hover {
+  color: #ffffff;
+}
+
+.login-btn {
+  background-color: #4a5568;
+  color: #e2e8f0;
+  border: none;
+  padding: 14px 60px;
+  font-size: 1.1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 400;
+  margin-top: 1.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.login-btn:hover {
+  background-color: #5a6778;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+}
+
+.login-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .login-title {
+    font-size: 1.8rem;
+  }
+
+  .app-logo {
+    width: 100px;
+    height: 100px;
+  }
+
+  .form-input {
+    padding: 12px 14px;
+    font-size: 0.95rem;
+  }
+
+  .login-btn {
+    padding: 12px 50px;
+    font-size: 1rem;
+  }
+}
