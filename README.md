@@ -1,3 +1,0 @@
-Schedify: A Time-Triggered Event Scheduling System for Automated Class Reminders Notification in Academic Schedules
-
-Schedify is a smart scheduling companion designed for students and educators who want to stay on top of their academic calendar without the stress of manual tracking. By leveraging time-triggered event automation, Schedify sends timely, intelligent reminders for classes, exams, deadlines, and academic activities — so nothing ever slips through the cracks. Whether you're juggling a packed semester or managing a complex teaching schedule, Schedify adapts to your routine and delivers the right notification at the right moment. Set it once, and let the system do the rest.
