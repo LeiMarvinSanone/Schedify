@@ -102,9 +102,9 @@ const Login = () => {
             style={styles.picker}
             dropdownIconColor="#a0aec0"
           >
-            <Picker.Item label="Select role..." value="" color="#a0aec0" />
-            <Picker.Item label="Student" value="student" color="#fff" />
-            <Picker.Item label="Professor" value="professor" color="#fff" />
+            <Picker.Item label="Select role..." value="" color="#999" />
+            <Picker.Item label="Student" value="student" color="#333" />
+            <Picker.Item label="Professor" value="professor" color="#333" />
           </Picker>
         </View>
       </View>
@@ -180,12 +180,12 @@ const styles = StyleSheet.create({
   pickerWrapper: {
     backgroundColor: '#5a6778',
     borderRadius: 8,
-    overflow: 'hidden',
+    paddingHorizontal: 4,
   },
   picker: {
     color: '#ffffff',
-    backgroundColor: '#5a6778',
-    height: 50,
+    backgroundColor: 'transparent',
+    height: 52,
   },
   button: {
     backgroundColor: '#4a5568',

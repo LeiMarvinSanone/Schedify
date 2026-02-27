@@ -130,9 +130,9 @@ const SignUp = () => {
                 style={styles.picker}
                 dropdownIconColor="#8a9bb0"
               >
-                <Picker.Item label="Select Department" value="" color="#8a9bb0" />
+                <Picker.Item label="Select Department" value="" color="#999" />
                 {DEPARTMENTS.map(d => (
-                  <Picker.Item key={d} label={d} value={d} color="#fff" />
+                  <Picker.Item key={d} label={d} value={d} color="#333" />
                 ))}
               </Picker>
             </View>
@@ -149,9 +149,9 @@ const SignUp = () => {
                 dropdownIconColor="#8a9bb0"
                 enabled={!!formData.department}
               >
-                <Picker.Item label="Select Course" value="" color="#8a9bb0" />
+                <Picker.Item label="Select Course" value="" color="#999" />
                 {(COURSES[formData.department] || []).map(c => (
-                  <Picker.Item key={c} label={c} value={c} color="#fff" />
+                  <Picker.Item key={c} label={c} value={c} color="#333" />
                 ))}
               </Picker>
             </View>
@@ -167,9 +167,9 @@ const SignUp = () => {
             style={styles.picker}
             dropdownIconColor="#8a9bb0"
           >
-            <Picker.Item label="Select Block" value="" color="#8a9bb0" />
+            <Picker.Item label="Select Block" value="" color="#999" />
             {BLOCKS.map(b => (
-              <Picker.Item key={b} label={b} value={b} color="#fff" />
+              <Picker.Item key={b} label={b} value={b} color="#333" />
             ))}
           </Picker>
         </View>
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   pickerWrapper: {
     backgroundColor: '#5a6778',
     borderRadius: 8,
-    overflow: 'hidden',
+    paddingHorizontal: 4,
   },
   pickerDisabled: {
     opacity: 0.5,
@@ -280,8 +280,8 @@ const styles = StyleSheet.create({
   },
   picker: {
     color: '#ffffff',
-    backgroundColor: '#5a6778',
-    height: 48,
+    backgroundColor: 'transparent',
+    height: 52,
   },
   roleRow: {
     flexDirection: 'row',
