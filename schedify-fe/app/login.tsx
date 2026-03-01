@@ -17,7 +17,6 @@ const Login = () => {
   };
 
   const handleSubmit = async () => {
-    // Basic validation
     const newErrors: Record<string, string> = {};
     if (!formData.email) newErrors.email = 'Email is required';
     if (!formData.password) newErrors.password = 'Password is required';
@@ -56,7 +55,7 @@ const Login = () => {
         resizeMode="contain"
       />
 
-      {/* App Name with accent on 'e' */}
+      {/* App Name */}
       <Text style={styles.appName}>
         <Text style={styles.appNameNormal}>Sch</Text>
         <Text style={styles.appNameNormal}>e</Text>
@@ -147,7 +146,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   appNameAccent: {
-    color: '#68d391',  // green accent on 'e' matching prototype
+    color: '#68d391',
     fontWeight: '400',
   },
   formGroup: {

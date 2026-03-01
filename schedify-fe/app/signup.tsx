@@ -56,7 +56,6 @@ const SignUp = () => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-
         {/* Header: logo + app name */}
         <View style={styles.header}>
           <Image
@@ -117,7 +116,6 @@ const SignUp = () => {
 
         {/* Department + Course side by side */}
         <View style={styles.row}>
-          {/* Department */}
           <View style={styles.half}>
             <Text style={styles.label}>Department</Text>
             <View style={styles.pickerWrapper}>
@@ -125,7 +123,7 @@ const SignUp = () => {
                 selectedValue={formData.department}
                 onValueChange={val => {
                   update('department', val);
-                  update('course', ''); // reset course on dept change
+                  update('course', '');
                 }}
                 style={styles.picker}
                 dropdownIconColor="#8a9bb0"
@@ -138,7 +136,6 @@ const SignUp = () => {
             </View>
           </View>
 
-          {/* Course */}
           <View style={styles.half}>
             <Text style={styles.label}>Course</Text>
             <View style={[styles.pickerWrapper, !formData.department && styles.pickerDisabled]}>
