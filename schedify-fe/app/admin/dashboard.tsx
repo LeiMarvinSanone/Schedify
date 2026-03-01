@@ -1,20 +1,21 @@
 import React from 'react';
 import {
-    View, Text, TouchableOpacity,
+  View, Text,
   StyleSheet, ScrollView, StatusBar,
+} from 'react-native';
+import { ICONS } from '../../constants/icons';
+import { useTheme } from '../../ThemeContext';
+import BottomNav from '../../components/BottomNav';
 
-}from 'react-native';
-import {router} from 'expo-router';
-
-type TagType = 'course'|'department'|'university';
+type TagType = 'course' | 'department' | 'university';
 type Schedule = {
   id: string;
   title: string;
   date: string;
   time: string;
   tag: TagType;
-  tagValue: string;          
-  reminders: string[];     
+  tagValue: string;
+  reminders: string[];
 };
 
 const SAMPLE_SCHEDULES: Schedule[] = [
@@ -25,7 +26,7 @@ const SAMPLE_SCHEDULES: Schedule[] = [
     time: '08:00',
     tag: 'course',
     tagValue: 'BSIT',
-    reminders: ['1 Day Before', '1 Hour Before'],
+    reminders: ['1 Day Before'],
   },
   {
     id: '2',
@@ -34,7 +35,7 @@ const SAMPLE_SCHEDULES: Schedule[] = [
     time: '14:00',
     tag: 'university',
     tagValue: 'All',
-    reminders: ['1 Day Before', '3 Hours Before'],
+    reminders: ['1 Day Before'],
   },
   {
     id: '3',
@@ -43,69 +44,78 @@ const SAMPLE_SCHEDULES: Schedule[] = [
     time: '10:00',
     tag: 'department',
     tagValue: 'CICT',
-    reminders: ['1 Hour Before', '30 Mins Before'],
+    reminders: ['1 Hour Before'],
   },
-]
+];
 
-function getTagColor(tag: TagType) {
-  if (tag === 'course')     return { bg: '#2d1f6e', text: '#a78bfa', border: '#5b3fd4' };
-  if (tag === 'department') return { bg: '#1a2f1a', text: '#4ade80', border: '#22c55e' };
-  return                           { bg: '#1a2a1a', text: '#4ade80', border: '#16a34a' }; // university
+// ── Tag colors — uses theme so light mode gets lighter tints ──
+function getTagColor(tag: TagType, isDark: boolean) {
+  if (tag === 'course')
+    return isDark
+      ? { bg: '#2d1f6e', text: '#a78bfa', border: '#5b3fd4' }
+      : { bg: '#ede9fe', text: '#7c3aed', border: '#c4b5fd' };
+  if (tag === 'department')
+    return isDark
+      ? { bg: '#1a2f1a', text: '#4ade80', border: '#22c55e' }
+      : { bg: '#dcfce7', text: '#16a34a', border: '#86efac' };
+  return isDark
+    ? { bg: '#1a2a1a', text: '#4ade80', border: '#16a34a' }
+    : { bg: '#f0fdf4', text: '#15803d', border: '#86efac' };
 }
 
 function getTagIcon(tag: TagType) {
-  if (tag === 'course')     return '📘';
-  if (tag === 'department') return '🏛️';
-  return '↑';  // university / all
+  if (tag === 'course')     return ICONS.stats.courses;
+  if (tag === 'department') return ICONS.meta.building;
+  return ICONS.postTypes.class;
 }
 
 function getReminderIcon(reminder: string) {
-  if (reminder.includes('Day'))   return '📅';
-  if (reminder.includes('Hour'))  return '🕐';
-  if (reminder.includes('Mins'))  return '⚡';
-  return '🔔'; // At Event Time
+  if (reminder.includes('Day'))  return ICONS.meta.time;
+  if (reminder.includes('Hour')) return ICONS.meta.time;
+  if (reminder.includes('Mins')) return ICONS.meta.time;
+  return '🔔';
 }
 
+// ── TagBadge — reads theme for dark/light tints ──
 function TagBadge({ tag, tagValue }: { tag: TagType; tagValue: string }) {
-  const colors = getTagColor(tag);
-  const icon = getTagIcon(tag);
+  const { isDark } = useTheme();
+  const colors = getTagColor(tag, isDark);
+  const icon   = getTagIcon(tag);
 
   return (
-    <View style={[
-      styles.tagBadge,
-      { backgroundColor: colors.bg, borderColor: colors.border }
-    ]}>
+    <View style={[styles.tagBadge, { backgroundColor: colors.bg, borderColor: colors.border }]}>
       <Text style={styles.tagIcon}>{icon}</Text>
       <Text style={[styles.tagText, { color: colors.text }]}>{tagValue}</Text>
     </View>
   );
 }
 
+// ── ReminderChip — uses theme.input + theme.divider ──
 function ReminderChip({ label }: { label: string }) {
+  const { theme } = useTheme();
   const icon = getReminderIcon(label);
   return (
-    <View style={styles.reminderChip}>
+    <View style={[styles.reminderChip, { backgroundColor: theme.input, borderColor: theme.divider }]}>
       <Text style={styles.reminderIcon}>{icon}</Text>
-      <Text style={styles.reminderText}>{label}</Text>
+      <Text style={[styles.reminderText, { color: theme.subtitle }]}>{label}</Text>
     </View>
   );
 }
 
-function ScheduleCard({ item }: {item: Schedule}) {
-    return (
-        <View style = {styles.card}>
-            <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                    {item.title}
-                </Text>
-                <TagBadge tag={item.tag} tagValue={item.tagValue} />
-            </View>
-            <Text style={styles.cardDate}>{item.date} · {item.time}</Text>
-
-      {/* Reminder chips row */}
+// ── ScheduleCard — uses theme.card + theme.cardBorder ──
+function ScheduleCard({ item }: { item: Schedule }) {
+  const { theme } = useTheme();
+  return (
+    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
+      <View style={styles.cardHeader}>
+        <Text style={[styles.cardTitle, { color: theme.text }]} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <TagBadge tag={item.tag} tagValue={item.tagValue} />
+      </View>
+      <Text style={[styles.cardDate, { color: theme.muted }]}>{item.date} · {item.time}</Text>
       <View style={styles.remindersRow}>
         {item.reminders.map((reminder, index) => (
-          // KEY: when rendering a list, React needs a unique "key" on each item
           <ReminderChip key={index} label={reminder} />
         ))}
       </View>
@@ -113,86 +123,57 @@ function ScheduleCard({ item }: {item: Schedule}) {
   );
 }
 
-function StatCard({
-  icon, value, label, color,
-}: {
-  icon: string;
-  value: number;
-  label: string;
-  color: string;
+// ── StatCard — uses theme.card + theme.cardBorder ──
+function StatCard({ icon, value, label, color }: {
+  icon: string; value: number; label: string; color: string;
 }) {
+  const { theme } = useTheme();
   return (
-    <View style={styles.statCard}>
+    <View style={[styles.statCard, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
       <Text style={styles.statIcon}>{icon}</Text>
       <Text style={[styles.statValue, { color }]}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={[styles.statLabel, { color: theme.muted }]}>{label}</Text>
     </View>
   );
 }
 
-function BottomNav({ active }: { active: string }) {
-  const tabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: '⊞' },
-    { id: 'post',      label: 'Post',      icon: '+' },
-    { id: 'schedules', label: 'Schedules', icon: '≡' },
-    { id: 'settings',  label: 'Settings',  icon: '⚙' },
-  ];
-
-  return (
-    <View style={styles.bottomNav}>
-      {tabs.map(tab => (
-        <TouchableOpacity
-          key={tab.id}
-          style={styles.navTab}
-          onPress={() => tab.id !== 'dashboard' && router.push(`/admin/${tab.id}` as any)}
-        >
-          <Text style={[
-            styles.navIcon,
-            active === tab.id && styles.navIconActive,
-          ]}>
-            {tab.icon}
-          </Text>
-          <Text style={[
-            styles.navLabel,
-            active === tab.id && styles.navLabelActive,
-          ]}>
-            {tab.label}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-}
-
+// main
 export default function AdminDashboard() {
+  const { theme, isDark } = useTheme();
 
   const totalSchedules = SAMPLE_SCHEDULES.length;
-  const thisMonth = SAMPLE_SCHEDULES.filter(s => s.date.startsWith('2026-02')).length;
-  const courseTags = SAMPLE_SCHEDULES.filter(s => s.tag === 'course').length;
-  const deptTags = SAMPLE_SCHEDULES.filter(s => s.tag === 'department').length;
+  const thisMonth      = SAMPLE_SCHEDULES.filter(s => s.date.startsWith('2026-02')).length;
+  const courseTags     = SAMPLE_SCHEDULES.filter(s => s.tag === 'course').length;
+  const deptTags       = SAMPLE_SCHEDULES.filter(s => s.tag === 'department').length;
 
   return (
-    <View style={styles.screen}>
-      <StatusBar barStyle="light-content" backgroundColor="#0f0f1a" />
+    <View style={[styles.screen, { backgroundColor: theme.bg }]}>
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.bg}
+      />
 
       <ScrollView
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+        
         <View style={styles.header}>
-          <Text style={styles.welcomeText}>Welcome back</Text>
-          <Text style={styles.headerTitle}>Admin Dashboard</Text>
+          <Text style={[styles.welcomeText, { color: theme.muted }]}>Welcome back</Text>
+          <Text style={[styles.headerTitle,  { color: theme.title }]}>Admin Dashboard</Text>
         </View>
 
+        
         <View style={styles.statsGrid}>
-          <StatCard icon="📅" value={totalSchedules} label="Total Schedules" color="#ffffff" />
-          <StatCard icon="📅" value={thisMonth}      label="This Month"      color="#ffffff" />
-          <StatCard icon="📘" value={courseTags}     label="Course Tags"     color="#ffffff" />
-          <StatCard icon="🏛️" value={deptTags}       label="Dept Tags"       color="#ffffff" />
+          <StatCard icon={ICONS.stats.schedules}   value={totalSchedules} label="Total Schedules" color={theme.text} />
+          <StatCard icon={ICONS.stats.monthly}     value={thisMonth}      label="This Month"      color={theme.text} />
+          <StatCard icon={ICONS.stats.courses}     value={courseTags}     label="Course Tags"     color={theme.text} />
+          <StatCard icon={ICONS.stats.departments} value={deptTags}       label="Dept Tags"       color={theme.text} />
         </View>
 
-        <Text style={styles.sectionTitle}>RECENT POSTS</Text>
+       
+        <Text style={[styles.sectionTitle, { color: theme.muted }]}>RECENT POSTS</Text>
 
         {SAMPLE_SCHEDULES.map(schedule => (
           <ScheduleCard key={schedule.id} item={schedule} />
@@ -201,170 +182,41 @@ export default function AdminDashboard() {
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      <BottomNav active="dashboard" />
+      <BottomNav role="admin" active="dashboard" />
     </View>
   );
 }
 
+
 const styles = StyleSheet.create({
+  screen:        { flex: 1 },
+  scroll:        { flex: 1 },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 52, paddingBottom: 12 },
 
-  // ── Outer container ──
-  screen: {
-    flex: 1,                  // fill the entire screen height
-    backgroundColor: '#0f0f1a',
-  },
+  header:      { marginBottom: 20 },
+  welcomeText: { fontSize: 13, fontWeight: '400', marginBottom: 4 },
+  headerTitle: { fontSize: 26, fontWeight: '700', letterSpacing: 0.5 },
 
-  scroll: { flex: 1 },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 52,           // space for the status bar
-    paddingBottom: 12,
-  },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24 },
+  statCard:  { borderRadius: 14, padding: 16, width: '47%', borderWidth: 1 },
+  statIcon:  { fontSize: 22, marginBottom: 8 },
+  statValue: { fontSize: 28, fontWeight: '700', marginBottom: 4 },
+  statLabel: { fontSize: 12, fontWeight: '500' },
 
-  // ── Header ──
-  header: { marginBottom: 20 },
-  welcomeText: {
-    color: '#718096',
-    fontSize: 13,
-    fontWeight: '400',
-    marginBottom: 4,
-  },
-  headerTitle: {
-    color: '#ffffff',
-    fontSize: 26,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
+  sectionTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 1.5, marginBottom: 12 },
 
-  // ── Stats grid ──
-  statsGrid: {
-    flexDirection: 'row',     
-    flexWrap: 'wrap',         
-    gap: 12,
-    marginBottom: 24,
-  },
-  statCard: {
-    backgroundColor: '#1a1a2e',
-    borderRadius: 14,
-    padding: 16,
-    width: '47%',            
-    borderWidth: 1,
-    borderColor: '#2d2d4e',
-  },
-  statIcon: { fontSize: 22, marginBottom: 8 },
-  statValue: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  statLabel: {
-    color: '#718096',
-    fontSize: 12,
-    fontWeight: '500',
-  },
+  card:       { borderRadius: 14, padding: 16, marginBottom: 10, borderWidth: 1 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 },
+  cardTitle:  { fontSize: 15, fontWeight: '700', flex: 1 },
+  cardDate:   { fontSize: 12, marginBottom: 10 },
 
-  // ── Section title ──
-  sectionTitle: {
-    color: '#718096',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1.5,       
-    marginBottom: 12,
-  },
-
-  // ── Schedule card ──
-  card: {
-    backgroundColor: '#1a1a2e',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#2d2d4e',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between', 
-    alignItems: 'flex-start',
-    marginBottom: 6,
-  },
-  cardTitle: {
-    color: '#e2e8f0',
-    fontSize: 15,
-    fontWeight: '700',
-    flex: 1,                  
-  },
-  cardDate: {
-    color: '#718096',
-    fontSize: 12,
-    marginBottom: 10,
-  },
-
-  // ── Reminder chips row ──
-  remindersRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  reminderChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0f0f1a',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: '#2d2d4e',
-    gap: 5,
-  },
+  remindersRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  reminderChip: { flexDirection: 'row', alignItems: 'center', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, gap: 5 },
   reminderIcon: { fontSize: 11 },
-  reminderText: {
-    color: '#a0aec0',
-    fontSize: 11,
-    fontWeight: '500',
-  },
+  reminderText: { fontSize: 11, fontWeight: '500' },
 
-  // ── Tag badge (BSIT / CCS / All) ──
-  tagBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderWidth: 1,
-    gap: 4,
-  },
-  tagIcon: { fontSize: 11 },
-  tagText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  bottomNav: {
-    flexDirection: 'row',
-    backgroundColor: '#1a1a2e',
-    borderTopWidth: 1,
-    borderTopColor: '#2d2d4e',
-    paddingBottom: 24,        
-    paddingTop: 10,
-  },
-  navTab: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 3,
-  },
-  navIcon: {
-    fontSize: 20,
-    color: '#4a5568',
-  },
-  navIconActive: {
-    color: '#a78bfa',         
-  },
-  navLabel: {
-    fontSize: 11,
-    color: '#4a5568',
-    fontWeight: '500',
-  },
-  navLabelActive: {
-    color: '#a78bfa',
-    fontWeight: '700',
-  },
+  tagBadge: { flexDirection: 'row', alignItems: 'center', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, gap: 4 },
+  tagIcon:  { fontSize: 11 },
+  tagText:  { fontSize: 11, fontWeight: '700' },
+
 });

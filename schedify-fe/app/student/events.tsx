@@ -4,8 +4,9 @@ import {
   ScrollView, StatusBar, Animated, LayoutAnimation,
   Platform, UIManager,
 } from 'react-native';
-import { router } from 'expo-router';
 import { useTheme } from '../../ThemeContext';
+import { ICONS } from '../../constants/icons';
+import BottomNav from '../../components/BottomNav';
 
 if (Platform.OS === 'android') {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
@@ -53,7 +54,7 @@ const DATA: Record<EventType, { label: string; color: string; textColor: string;
   },
 };
 
-// ─── ACCORDION SECTION ─────────────────────────────────────────────
+
 function AccordionSection({ type, isDark }: { type: EventType; isDark: boolean }) {
   const [open, setOpen] = useState(false);
   const rotateAnim = useRef(new Animated.Value(0)).current;
@@ -71,7 +72,6 @@ function AccordionSection({ type, isDark }: { type: EventType; isDark: boolean }
 
   const rotate = rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
 
-  // Theme-aware colors for body/items
   const bodyBg    = isDark ? '#1e2a3a' : '#f8fafc';
   const itemBg    = isDark ? '#151f2e' : '#ffffff';
   const titleColor = isDark ? '#e2e8f0' : '#1e293b';
@@ -99,19 +99,17 @@ function AccordionSection({ type, isDark }: { type: EventType; isDark: boolean }
                 style={[acc.item, { borderLeftColor: color, backgroundColor: itemBg },
                   i < items.length - 1 && acc.itemDivider]}>
 
-                {/* Date badge */}
                 <View style={[acc.dateBadge, { backgroundColor: color + '22', borderColor: color + '55' }]}>
                   <Text style={[acc.dateText, { color }]}>{item.date?.split(' ')[0]}</Text>
                   <Text style={[acc.dateNum,  { color }]}>{item.date?.split(' ')[1]}</Text>
                 </View>
 
-                {/* Details */}
                 <View style={acc.itemContent}>
                   <Text style={[acc.itemTitle, { color: titleColor }]}>{item.title}</Text>
                   <View style={acc.itemMeta}>
-                    {item.time && <Text style={[acc.metaChip, { color: metaColor }]}>🕐 {item.time}</Text>}
-                    {item.room && <Text style={[acc.metaChip, { color: metaColor }]}>📍 {item.room}</Text>}
-                    {item.org  && <Text style={[acc.metaChip, { color: metaColor }]}>🏛 {item.org}</Text>}
+                    {item.time && <Text style={[acc.metaChip, { color: metaColor }]}>{ICONS.meta.time} {item.time}</Text>}
+                    {item.room && <Text style={[acc.metaChip, { color: metaColor }]}>{ICONS.meta.room} {item.room}</Text>}
+                    {item.org  && <Text style={[acc.metaChip, { color: metaColor }]}>{ICONS.meta.organization} {item.org}</Text>}
                   </View>
                   {item.description && (
                     <Text style={[acc.itemDesc, { color: descColor }]} numberOfLines={2}>
@@ -166,45 +164,9 @@ const acc = StyleSheet.create({
   itemDesc: { fontSize: 11, marginTop: 5, fontStyle: 'italic', lineHeight: 16 },
 });
 
-// ─── BOTTOM NAV ────────────────────────────────────────────────────
-function BottomNav({ active, isDark }: { active: string; isDark: boolean }) {
-  const tabs = [
-    { id: 'calendar', label: 'Calendar', icon: '📅' },
-    { id: 'events',   label: 'Events',   icon: '☰' },
-    { id: 'profile',  label: 'Profile',  icon: '👤' },
-  ];
-  const navBg     = isDark ? '#131d2a' : '#ffffff';
-  const navBorder = isDark ? '#1e2a3a' : '#e2e8f0';
-  const labelColor = isDark ? '#4a5878' : '#94a3b8';
-  const activeLabelColor = isDark ? '#e2e8f0' : '#1e293b';
-
-  return (
-    <View style={[bn.container, { backgroundColor: navBg, borderTopColor: navBorder }]}>
-      {tabs.map(t => (
-        <TouchableOpacity key={t.id} style={bn.tab}
-          onPress={() => t.id !== 'events' && router.push(`/student/${t.id}` as any)}>
-          <Text style={[bn.icon, active === t.id && bn.activeIcon]}>{t.icon}</Text>
-          <Text style={[bn.label, { color: labelColor }, active === t.id && { color: activeLabelColor, fontWeight: '700' }]}>
-            {t.label}
-          </Text>
-          {active === t.id && <View style={bn.activeDot} />}
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-}
-const bn = StyleSheet.create({
-  container: { flexDirection: 'row', borderTopWidth: 1, paddingBottom: 20, paddingTop: 10 },
-  tab: { flex: 1, alignItems: 'center', gap: 2 },
-  icon: { fontSize: 22, opacity: 0.35 },
-  activeIcon: { opacity: 1 },
-  label: { fontSize: 11, fontWeight: '500' },
-  activeDot: { position: 'absolute', bottom: -10, width: 18, height: 3, borderRadius: 2, backgroundColor: '#86efac' },
-});
-
-// ─── MAIN SCREEN ───────────────────────────────────────────────────
+// main
 export default function EventsScreen() {
-  const { isDark } = useTheme(); // ✅ global theme — syncs with Profile toggle
+  const { isDark } = useTheme(); 
 
   const screenBg    = isDark ? '#0f172a' : '#f0f4f8';
   const headerBg    = isDark ? '#131d2a' : '#ffffff';
@@ -216,13 +178,13 @@ export default function EventsScreen() {
     <View style={[s.screen, { backgroundColor: screenBg }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={headerBg} />
 
-      {/* Header */}
+     
       <View style={[s.header, { backgroundColor: headerBg, borderBottomColor: headerBorder }]}>
         <Text style={[s.title, { color: titleColor }]}>Schedify</Text>
         <Text style={[s.subtitle, { color: subtitleColor }]}>My Schedules</Text>
       </View>
 
-      {/* Accordion list */}
+     
       <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
         <AccordionSection type="event"      isDark={isDark} />
         <AccordionSection type="class"      isDark={isDark} />
@@ -230,7 +192,7 @@ export default function EventsScreen() {
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      <BottomNav active="events" isDark={isDark} />
+      <BottomNav role="student" active="events" />
     </View>
   );
 }

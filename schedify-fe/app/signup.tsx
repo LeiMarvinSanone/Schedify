@@ -9,8 +9,8 @@ import { Picker } from '@react-native-picker/picker';
 type Role = 'Student' | 'Professor';
 
 const COURSES: Record<string, string[]> = {
-  CICT: ['BSIT', 'BSCS', 'BSIS','BTVTED'],
-  CBME: ['BSA', 'BSAIS', 'BSE','BPA'],
+  CICT: ['BSIT', 'BSCS', 'BSIS', 'BTVTED'],
+  CBME: ['BSA', 'BSAIS', 'BSE', 'BPA'],
 };
 
 const DEPARTMENTS = Object.keys(COURSES);
@@ -57,7 +57,7 @@ const SignUp = () => {
         showsVerticalScrollIndicator={false}
       >
 
-        {/* Header: logo + app name */}
+        
         <View style={styles.header}>
           <Image
             source={require('../assets/images/logo.png')}
@@ -71,7 +71,7 @@ const SignUp = () => {
           </Text>
         </View>
 
-        {/* Name */}
+        
         <Text style={styles.label}>Name</Text>
         <TextInput
           style={styles.input}
@@ -81,7 +81,6 @@ const SignUp = () => {
           placeholderTextColor="#8a9bb0"
         />
 
-        {/* Sorsu Email */}
         <Text style={styles.label}>Sorsu Email</Text>
         <TextInput
           style={styles.input}
@@ -93,7 +92,7 @@ const SignUp = () => {
           autoCapitalize="none"
         />
 
-        {/* Password */}
+
         <Text style={styles.label}>Password</Text>
         <TextInput
           style={styles.input}
@@ -104,7 +103,6 @@ const SignUp = () => {
           secureTextEntry
         />
 
-        {/* ID No. */}
         <Text style={styles.label}>ID no.</Text>
         <TextInput
           style={styles.input}
@@ -115,9 +113,7 @@ const SignUp = () => {
           keyboardType="numeric"
         />
 
-        {/* Department + Course side by side */}
         <View style={styles.row}>
-          {/* Department */}
           <View style={styles.half}>
             <Text style={styles.label}>Department</Text>
             <View style={styles.pickerWrapper}>
@@ -125,7 +121,7 @@ const SignUp = () => {
                 selectedValue={formData.department}
                 onValueChange={val => {
                   update('department', val);
-                  update('course', ''); // reset course on dept change
+                  update('course', ''); 
                 }}
                 style={styles.picker}
                 dropdownIconColor="#8a9bb0"
@@ -138,7 +134,6 @@ const SignUp = () => {
             </View>
           </View>
 
-          {/* Course */}
           <View style={styles.half}>
             <Text style={styles.label}>Course</Text>
             <View style={[styles.pickerWrapper, !formData.department && styles.pickerDisabled]}>
@@ -158,7 +153,6 @@ const SignUp = () => {
           </View>
         </View>
 
-        {/* Block */}
         <Text style={styles.label}>Block</Text>
         <View style={[styles.pickerWrapper, styles.blockPickerWidth]}>
           <Picker
@@ -174,7 +168,6 @@ const SignUp = () => {
           </Picker>
         </View>
 
-        {/* Role radio buttons */}
         <View style={styles.roleRow}>
           <View style={styles.roleTag}>
             <Text style={styles.roleTagText}>Role</Text>
@@ -194,12 +187,10 @@ const SignUp = () => {
           ))}
         </View>
 
-        {/* Sign Up Button */}
         <TouchableOpacity style={styles.button} onPress={handleSubmit} activeOpacity={0.85}>
           <Text style={styles.buttonText}>Sign up</Text>
         </TouchableOpacity>
 
-        {/* Back to login */}
         <View style={styles.loginRow}>
           <Text style={styles.loginText}>Already have an account? </Text>
           <TouchableOpacity onPress={() => router.push('/login' as any)}>
