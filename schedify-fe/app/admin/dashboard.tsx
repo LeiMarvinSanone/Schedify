@@ -338,8 +338,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
-
-  // ── Bottom navigation ──
   bottomNav: {
     flexDirection: 'row',
     backgroundColor: '#1a1a2e',
