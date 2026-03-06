@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, StatusBar, Animated, LayoutAnimation,
@@ -7,6 +7,17 @@ import {
 import { useTheme } from '../../ThemeContext';
 import { ICONS } from '../../constants/icons';
 import BottomNav from '../../components/BottomNav';
+import { useFocusEffect } from '@react-navigation/native';
+import { getPostedCalendarEvents, subscribeScheduleChanges } from '../../utils/scheduleStore';
+import {
+  getClassReminderOverrides,
+  getDefaultClassReminder,
+  reminderOptionLabel,
+  setClassReminderSelection,
+  type ReminderOption,
+  type ReminderSelection,
+} from '../../utils/classReminderStore';
+import { syncClassReminderNotifications } from '../../utils/classReminderScheduler';
 
 if (Platform.OS === 'android') {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
@@ -20,45 +31,93 @@ interface ScheduleItem {
   subtitle?: string;
   time?: string;
   room?: string;
+  building?: string;
+  department?: string;
   org?: string;
   description?: string;
   date?: string;
 }
 
-const DATA: Record<EventType, { label: string; color: string; textColor: string; items: ScheduleItem[] }> = {
+type SectionData = { label: string; color: string; textColor: string; items: ScheduleItem[] };
+
+const REMINDER_CHOICES: ReminderSelection[] = ['use_default', 'off', '10m', '30m', '1h'];
+
+const DEFAULT_DATA: Record<EventType, SectionData> = {
   event: {
     label: 'Events',
     color: '#8bb7e7',
     textColor: '#1a1a00',
-    items: [
-      { id: 'e1', title: 'CICT CON', subtitle: 'CICT Congress', time: '8:00 AM', org: 'CICT CON', date: 'Feb 26', description: 'CICT Congress annual event.' },
-      { id: 'e2', title: 'Sports Fest', subtitle: 'University-wide', time: '8:00 AM – 5:00 PM', org: 'SSC', date: 'Feb 27', description: 'University-wide Sports Festival.' },
-    ],
+    items: [],
   },
   class: {
     label: 'Class Schedules',
     color: '#5cba6a',
     textColor: '#0a1f0e',
-    items: [
-      { id: 'c1', title: 'IT101 Lec', time: '7:30 AM – 9:00 AM', room: 'Room 301', org: 'CICT Dept', date: 'Feb 24' },
-      { id: 'c2', title: 'IT102 Lab', time: '1:00 PM – 4:00 PM', room: 'Lab 2', org: 'CICT Dept', date: 'Feb 26' },
-    ],
+    items: [],
   },
   suspension: {
     label: 'Suspensions',
     color: '#c94040',
     textColor: '#ffffff',
-    items: [
-      { id: 's1', title: 'No Classes', time: 'All Day', org: 'University Admin', date: 'Feb 25', description: 'Classes suspended — Local Holiday.' },
-    ],
+    items: [],
   },
 };
 
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-function AccordionSection({ type, isDark }: { type: EventType; isDark: boolean }) {
+function formatShortDate(dateString: string | undefined): string | undefined {
+  if (!dateString) return undefined;
+  const [yearStr, monthStr, dayStr] = dateString.split('-');
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  const year = Number(yearStr);
+  if (!year || !month || !day || month < 1 || month > 12) return undefined;
+  return `${MONTH_NAMES[month - 1]} ${day}`;
+}
+
+function buildEventsData(postedItems: Awaited<ReturnType<typeof getPostedCalendarEvents>>): Record<EventType, SectionData> {
+  const merged: Record<EventType, SectionData> = {
+    event: { ...DEFAULT_DATA.event, items: [...DEFAULT_DATA.event.items] },
+    class: { ...DEFAULT_DATA.class, items: [...DEFAULT_DATA.class.items] },
+    suspension: { ...DEFAULT_DATA.suspension, items: [...DEFAULT_DATA.suspension.items] },
+  };
+
+  postedItems.forEach((item) => {
+    merged[item.type].items.unshift({
+      id: item.id,
+      title: item.label,
+      time: item.time,
+      room: item.room,
+      building: item.building,
+      department: item.department,
+      org: item.org,
+      description: item.description,
+      date: formatShortDate(item.date),
+    });
+  });
+
+  return merged;
+}
+
+
+function AccordionSection({
+  type,
+  items,
+  isDark,
+  defaultReminder,
+  reminderOverrides,
+  onClassReminderChange,
+}: {
+  type: EventType;
+  items: ScheduleItem[];
+  isDark: boolean;
+  defaultReminder: ReminderOption;
+  reminderOverrides: Record<string, ReminderOption>;
+  onClassReminderChange: (eventId: string, value: ReminderSelection) => void;
+}) {
   const [open, setOpen] = useState(false);
   const rotateAnim = useRef(new Animated.Value(0)).current;
-  const { label, color, textColor, items } = DATA[type];
+  const { label, color, textColor } = DEFAULT_DATA[type];
 
   const toggle = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -109,12 +168,39 @@ function AccordionSection({ type, isDark }: { type: EventType; isDark: boolean }
                   <View style={acc.itemMeta}>
                     {item.time && <Text style={[acc.metaChip, { color: metaColor }]}>{ICONS.meta.time} {item.time}</Text>}
                     {item.room && <Text style={[acc.metaChip, { color: metaColor }]}>{ICONS.meta.room} {item.room}</Text>}
-                    {item.org  && <Text style={[acc.metaChip, { color: metaColor }]}>{ICONS.meta.organization} {item.org}</Text>}
+                    {item.building && <Text style={[acc.metaChip, { color: metaColor }]}>{ICONS.meta.building} {item.building}</Text>}
+                    {(item.department || item.org) && <Text style={[acc.metaChip, { color: metaColor }]}>{ICONS.meta.organization} {item.department || item.org}</Text>}
                   </View>
                   {item.description && (
                     <Text style={[acc.itemDesc, { color: descColor }]} numberOfLines={2}>
                       {item.description}
                     </Text>
+                  )}
+
+                  {type === 'class' && (
+                    <View style={acc.reminderRow}>
+                      {REMINDER_CHOICES.map((choice) => {
+                        const selected = (reminderOverrides[item.id] ?? 'use_default') === choice;
+                        return (
+                          <TouchableOpacity
+                            key={`${item.id}-${choice}`}
+                            style={[
+                              acc.reminderChip,
+                              { borderColor: color + '55', backgroundColor: color + '12' },
+                              selected && { borderColor: color + 'aa', backgroundColor: color + '2a' },
+                            ]}
+                            onPress={() => onClassReminderChange(item.id, choice)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[acc.reminderChipText, { color: selected ? color : metaColor }]}>
+                              {choice === 'use_default'
+                                ? reminderOptionLabel('use_default', defaultReminder)
+                                : reminderOptionLabel(choice)}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
                   )}
                 </View>
               </View>
@@ -162,11 +248,68 @@ const acc = StyleSheet.create({
   itemMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   metaChip: { fontSize: 11 },
   itemDesc: { fontSize: 11, marginTop: 5, fontStyle: 'italic', lineHeight: 16 },
+  reminderRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
+  reminderChip: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 8, paddingVertical: 5 },
+  reminderChipText: { fontSize: 10, fontWeight: '600' },
 });
 
 // main
 export default function EventsScreen() {
   const { isDark } = useTheme(); 
+  const [data, setData] = useState<Record<EventType, SectionData>>(DEFAULT_DATA);
+  const [defaultReminder, setDefaultReminder] = useState<ReminderOption>('30m');
+  const [reminderOverrides, setReminderOverrides] = useState<Record<string, ReminderOption>>({});
+
+  const reloadEvents = useCallback(async () => {
+    const [posted, currentDefault, currentOverrides] = await Promise.all([
+      getPostedCalendarEvents(),
+      getDefaultClassReminder(),
+      getClassReminderOverrides(),
+    ]);
+
+    setData(buildEventsData(posted));
+    setDefaultReminder(currentDefault);
+    setReminderOverrides(currentOverrides);
+    await syncClassReminderNotifications(posted, currentDefault, currentOverrides);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      (async () => {
+        const posted = await getPostedCalendarEvents();
+        if (!active) return;
+        setData(buildEventsData(posted));
+      })();
+
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
+  useEffect(() => {
+    const unsubscribe = subscribeScheduleChanges(() => {
+      void reloadEvents();
+    });
+    return unsubscribe;
+  }, [reloadEvents]);
+
+  const handleClassReminderChange = useCallback(
+    async (eventId: string, value: ReminderSelection) => {
+      await setClassReminderSelection(eventId, value);
+
+      const [posted, currentOverrides] = await Promise.all([
+        getPostedCalendarEvents(),
+        getClassReminderOverrides(),
+      ]);
+
+      setReminderOverrides(currentOverrides);
+      await syncClassReminderNotifications(posted, defaultReminder, currentOverrides);
+    },
+    [defaultReminder]
+  );
 
   const screenBg    = isDark ? '#0f172a' : '#f0f4f8';
   const headerBg    = isDark ? '#131d2a' : '#ffffff';
@@ -186,9 +329,30 @@ export default function EventsScreen() {
 
      
       <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
-        <AccordionSection type="event"      isDark={isDark} />
-        <AccordionSection type="class"      isDark={isDark} />
-        <AccordionSection type="suspension" isDark={isDark} />
+        <AccordionSection
+          type="event"
+          items={data.event.items}
+          isDark={isDark}
+          defaultReminder={defaultReminder}
+          reminderOverrides={reminderOverrides}
+          onClassReminderChange={handleClassReminderChange}
+        />
+        <AccordionSection
+          type="class"
+          items={data.class.items}
+          isDark={isDark}
+          defaultReminder={defaultReminder}
+          reminderOverrides={reminderOverrides}
+          onClassReminderChange={handleClassReminderChange}
+        />
+        <AccordionSection
+          type="suspension"
+          items={data.suspension.items}
+          isDark={isDark}
+          defaultReminder={defaultReminder}
+          reminderOverrides={reminderOverrides}
+          onClassReminderChange={handleClassReminderChange}
+        />
         <View style={{ height: 20 }} />
       </ScrollView>
 

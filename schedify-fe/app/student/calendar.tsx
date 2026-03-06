@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, StatusBar, TextInput,
@@ -7,6 +7,8 @@ import {
 import { useTheme } from '../../ThemeContext';
 import { ICONS } from '../../constants/icons';
 import BottomNav from '../../components/BottomNav';
+import { useFocusEffect } from '@react-navigation/native';
+import { getPostedCalendarEvents, subscribeScheduleChanges } from '../../utils/scheduleStore';
 
 const { width } = Dimensions.get('window');
 
@@ -29,18 +31,30 @@ type ViewType  = 'Month' | 'Year' | 'Week';
 
 interface CalEvent {
   label: string; type: EventType;
-  time?: string; room?: string; org?: string; description?: string;
+  time?: string; room?: string; building?: string; department?: string; org?: string; description?: string;
 }
 
-const EVENTS: Record<string, CalEvent[]> = {
-  '2026-02-24': [{ label: 'IT101 Lec', type: 'class', time: '7:30 AM - 9:00 AM', room: 'Room 301', org: 'CICT Dept' }],
-  '2026-02-25': [{ label: 'No Classes', type: 'suspension', time: 'All Day', org: 'University Admin', description: 'Classes suspended - Local Holiday.' }],
-  '2026-02-26': [
-    { label: 'IT102 Lab', type: 'class', time: '1:00 PM - 4:00 PM', room: 'Lab 2', org: 'CICT Dept' },
-    { label: 'CICT CON', type: 'event', time: '8:00 AM', org: 'CICT CON', description: 'CICT Congress annual event.' },
-  ],
-  '2026-02-27': [{ label: 'Sports Fest', type: 'event', time: '8:00 AM - 5:00 PM', org: 'SSC', description: 'University-wide Sports Festival.' }],
-};
+const DEFAULT_EVENTS: Record<string, CalEvent[]> = {};
+
+function mergeWithPostedEvents(postedEvents: Awaited<ReturnType<typeof getPostedCalendarEvents>>): Record<string, CalEvent[]> {
+  const merged: Record<string, CalEvent[]> = { ...DEFAULT_EVENTS };
+
+  postedEvents.forEach((item) => {
+    if (!merged[item.date]) merged[item.date] = [];
+    merged[item.date].push({
+      label: item.label,
+      type: item.type,
+      time: item.time,
+      room: item.room,
+      building: item.building,
+      department: item.department,
+      org: item.org,
+      description: item.description,
+    });
+  });
+
+  return merged;
+}
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const SHORT_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -62,9 +76,9 @@ interface SearchResult {
   event: CalEvent;
 }
 
-function buildSearchIndex(): SearchResult[] {
+function buildSearchIndex(eventsByDate: Record<string, CalEvent[]>): SearchResult[] {
   const results: SearchResult[] = [];
-  for (const [key, events] of Object.entries(EVENTS)) {
+  for (const [key, events] of Object.entries(eventsByDate)) {
     const [y, m, d] = key.split('-').map(Number);
     events.forEach((ev, i) => {
       results.push({ dateKey: key, year: y, month: m - 1, day: d, eventIndex: i, event: ev });
@@ -72,7 +86,6 @@ function buildSearchIndex(): SearchResult[] {
   }
   return results;
 }
-const SEARCH_INDEX = buildSearchIndex();
 
 
 function EventChip({ label, type, onPress, isDark }: { label: string; type: EventType; onPress: () => void; isDark: boolean }) {
@@ -149,7 +162,8 @@ function SearchDropdown({ results, isDark, onSelect, onClose }: {
                     <View style={sr.metaRow}>
                       {r.event.time && <Text style={[sr.meta, { color: isDark ? '#64748b' : '#94a3b8' }]}>{ICONS.meta.time} {r.event.time}</Text>}
                       {r.event.room && <Text style={[sr.meta, { color: isDark ? '#64748b' : '#94a3b8' }]}>{ICONS.meta.room} {r.event.room}</Text>}
-                      {r.event.org  && <Text style={[sr.meta, { color: isDark ? '#64748b' : '#94a3b8' }]}>{ICONS.meta.organization} {r.event.org}</Text>}
+                      {r.event.building && <Text style={[sr.meta, { color: isDark ? '#64748b' : '#94a3b8' }]}>{ICONS.meta.building} {r.event.building}</Text>}
+                      {(r.event.department || r.event.org) && <Text style={[sr.meta, { color: isDark ? '#64748b' : '#94a3b8' }]}>{ICONS.meta.organization} {r.event.department || r.event.org}</Text>}
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -199,7 +213,7 @@ function EventDetailPanel({ selectedDate, focusedIndex, events, year, month, onC
   React.useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 220, useNativeDriver: true }).start();
     return () => { fadeAnim.setValue(0); };
-  }, [selectedDate, focusedIndex]);
+  }, [selectedDate, focusedIndex, fadeAnim]);
 
   const displayEvents = focusedIndex !== null ? [events[focusedIndex]] : events;
   const dateObj = selectedDate ? new Date(year, month, selectedDate) : null;
@@ -273,7 +287,8 @@ function EventDetailPanel({ selectedDate, focusedIndex, events, year, month, onC
                       <View style={ep.infoLine}>
                         {ev.time && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>{ICONS.meta.time} {ev.time}</Text>}
                         {ev.room && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>{ICONS.meta.room} {ev.room}</Text>}
-                        {ev.org  && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>{ICONS.meta.organization} {ev.org}</Text>}
+                        {ev.building && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>{ICONS.meta.building} {ev.building}</Text>}
+                        {(ev.department || ev.org) && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>{ICONS.meta.organization} {ev.department || ev.org}</Text>}
                       </View>
                       {ev.description && <Text style={[ep.desc, { color: c.text + '88' }]} numberOfLines={2}>{ev.description}</Text>}
                     </View>
@@ -323,9 +338,10 @@ const ep = StyleSheet.create({
 });
 
 // month view
-function MonthView({ year, month, onPrev, onNext, onSelectDate, isDark }: {
+function MonthView({ year, month, onPrev, onNext, onSelectDate, isDark, eventsByDate }: {
   year: number; month: number; onPrev: () => void; onNext: () => void;
   onSelectDate: (date: number, ei: number | null) => void; isDark: boolean;
+  eventsByDate: Record<string, CalEvent[]>;
 }) {
   const [selectedDate, setSelectedDate] = useState<number | null>(null);
   const days = getDaysInMonth(year, month);
@@ -368,7 +384,7 @@ function MonthView({ year, month, onPrev, onNext, onSelectDate, isDark }: {
           <View key={wi} style={[mv.weekRow, { borderBottomColor: gridBorder }]}>
             {week.map((cell, di) => {
               const key = cell.current ? dateKey(year, month, cell.day) : '';
-              const evs = EVENTS[key] || [];
+              const evs = eventsByDate[key] || [];
               const isToday    = cell.current && cell.day === today;
               const isSelected = cell.current && cell.day === selectedDate;
               return (
@@ -465,20 +481,13 @@ function YearView({ year, isDark }: { year: number; isDark: boolean }) {
 }
 
 // week view
-const WEEK_EVENTS_DATA = [
-  { day: 0, row: 0, rowSpan: 1, label: 'Class Schedule', color: '#86efac' },
-  { day: 6, row: 0, rowSpan: 1, label: 'Class Schedule', color: '#86efac' },
-  { day: 1, row: 1, rowSpan: 2, label: 'Class Schedule', color: '#86efac' },
-  { day: 3, row: 1, rowSpan: 1, label: 'Class Schedule', color: '#86efac' },
-  { day: 5, row: 1, rowSpan: 1, label: 'Events',         color: '#93c5fd' },
-  { day: 1, row: 3, rowSpan: 1, label: 'No Classes',     color: '#fca5a5' },
-  { day: 2, row: 3, rowSpan: 2, label: 'Events',         color: '#93c5fd' },
-  { day: 4, row: 3, rowSpan: 1, label: 'Events',         color: '#93c5fd' },
-  { day: 6, row: 3, rowSpan: 1, label: 'Class Schedule', color: '#86efac' },
-  { day: 1, row: 5, rowSpan: 2, label: 'Events',         color: '#93c5fd' },
-  { day: 3, row: 5, rowSpan: 2, label: 'Class Schedule', color: '#86efac' },
-  { day: 5, row: 5, rowSpan: 1, label: 'Class Schedule', color: '#86efac' },
-];
+const WEEK_EVENTS_DATA: {
+  day: number;
+  row: number;
+  rowSpan: number;
+  label: string;
+  color: string;
+}[] = [];
 function WeekView({ isDark }: { isDark: boolean }) {
   const COL_WIDTH = (width - 32) / 7;
   const ROW_HEIGHT = 72;
@@ -553,31 +562,65 @@ const vs = StyleSheet.create({
 // main
 export default function CalendarScreen() {
   const { isDark } = useTheme();
+  const today = new Date();
 
   const [view, setView]           = useState<ViewType>('Month');
-  const [year, setYear]           = useState(2026);
-  const [month, setMonth]         = useState(1);
+  const [year, setYear]           = useState(today.getFullYear());
+  const [month, setMonth]         = useState(today.getMonth());
   const [search, setSearch]       = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedDate, setSelectedDate]         = useState<number | null>(null);
   const [focusedEventIndex, setFocusedEventIndex] = useState<number | null>(null);
+  const [eventsByDate, setEventsByDate] = useState<Record<string, CalEvent[]>>(DEFAULT_EVENTS);
+
+  const reloadEvents = useCallback(async () => {
+    const posted = await getPostedCalendarEvents();
+    setEventsByDate(mergeWithPostedEvents(posted));
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      (async () => {
+        const posted = await getPostedCalendarEvents();
+        if (!active) return;
+        setEventsByDate(mergeWithPostedEvents(posted));
+      })();
+
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
+  useEffect(() => {
+    const unsubscribe = subscribeScheduleChanges(() => {
+      reloadEvents();
+    });
+    return unsubscribe;
+  }, [reloadEvents]);
+
+  const searchIndex = useMemo(() => buildSearchIndex(eventsByDate), [eventsByDate]);
 
 
   const searchResults = useMemo<SearchResult[]>(() => {
     const q = search.trim().toLowerCase();
     if (!q) return [];
-    return SEARCH_INDEX.filter(r => {
+    return searchIndex.filter(r => {
       const ev = r.event;
       return (
         ev.label.toLowerCase().includes(q) ||
         ev.type.toLowerCase().includes(q)  ||
         TYPE_LABELS[ev.type].toLowerCase().includes(q) ||
         (ev.room?.toLowerCase().includes(q) ?? false) ||
+        (ev.building?.toLowerCase().includes(q) ?? false) ||
+        (ev.department?.toLowerCase().includes(q) ?? false) ||
         (ev.org?.toLowerCase().includes(q)  ?? false) ||
         (ev.description?.toLowerCase().includes(q) ?? false)
       );
     });
-  }, [search]);
+  }, [search, searchIndex]);
 
   const handleSearchChange = (text: string) => {
     setSearch(text);
@@ -616,7 +659,7 @@ export default function CalendarScreen() {
     if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1);
   };
 
-  const selectedDateEvents = selectedDate ? (EVENTS[dateKey(year, month, selectedDate)] || []) : [];
+  const selectedDateEvents = selectedDate ? (eventsByDate[dateKey(year, month, selectedDate)] || []) : [];
 
   return (
     <View style={[s.screen, { backgroundColor: screenBg }]}>
@@ -661,7 +704,7 @@ export default function CalendarScreen() {
       <View style={[s.content, { backgroundColor: screenBg }]}>
         {view === 'Month' && (
           <MonthView year={year} month={month} onPrev={handlePrev} onNext={handleNext}
-            onSelectDate={handleSelectDate} isDark={isDark} />
+            onSelectDate={handleSelectDate} isDark={isDark} eventsByDate={eventsByDate} />
         )}
         {view === 'Year'  && <YearView year={year} isDark={isDark} />}
         {view === 'Week'  && <WeekView isDark={isDark} />}

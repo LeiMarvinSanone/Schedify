@@ -42,7 +42,7 @@ const SignUp = () => {
     try {
       await new Promise(resolve => setTimeout(resolve, 300));
       Alert.alert('Success', 'Account created! Please login.');
-      router.replace('/login' as any);
+      router.replace('/student/login' as any);
     } catch {
       Alert.alert('Error', 'Failed. Please try again.');
     }
@@ -60,7 +60,7 @@ const SignUp = () => {
         
         <View style={styles.header}>
           <Image
-            source={require('../assets/images/logo.png')}
+            source={require('../../assets/images/logo.png')}
             style={styles.logo}
             resizeMode="contain"
           />
@@ -193,7 +193,7 @@ const SignUp = () => {
 
         <View style={styles.loginRow}>
           <Text style={styles.loginText}>Already have an account? </Text>
-          <TouchableOpacity onPress={() => router.push('/login' as any)}>
+          <TouchableOpacity onPress={() => router.push('/student/login' as any)}>
             <Text style={styles.linkText}>Login</Text>
           </TouchableOpacity>
         </View>

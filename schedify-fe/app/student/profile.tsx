@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   Switch, StatusBar, Alert, ScrollView, Image,
@@ -7,6 +7,16 @@ import { router } from 'expo-router';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { useTheme } from '../../ThemeContext';
 import BottomNav from '../../components/BottomNav';
+import { getPostedCalendarEvents } from '../../utils/scheduleStore';
+import {
+  CLASS_REMINDER_OPTIONS,
+  getClassReminderOverrides,
+  getDefaultClassReminder,
+  reminderOptionLabel,
+  setDefaultClassReminder,
+  type ReminderOption,
+} from '../../utils/classReminderStore';
+import { syncClassReminderNotifications } from '../../utils/classReminderScheduler';
 
 const AvatarIcon = ({ color }: { color: string }) => (
   <Svg width="52" height="52" viewBox="0 0 48 48" fill="none">
@@ -60,11 +70,12 @@ const BlockIcon = ({ color }: { color: string }) => (
 
 export default function Profile() {
   const { isDark, toggleTheme, theme: t } = useTheme();
+  const [defaultReminder, setDefaultReminder] = useState<ReminderOption>('30m');
 
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Log Out', style: 'destructive', onPress: () => router.replace('/login' as any) },
+      { text: 'Log Out', style: 'destructive', onPress: () => router.replace('/student/login' as any) },
     ]);
   };
 
@@ -73,6 +84,26 @@ export default function Profile() {
     { icon: <CourseIcon color={t.accent} />, label: 'Course', value: 'BSCS' },
     { icon: <BlockIcon color={t.accent} />, label: 'Block', value: 'Block B — 3-B' },
   ];
+
+  const reloadReminderSettings = useCallback(async () => {
+    const current = await getDefaultClassReminder();
+    setDefaultReminder(current);
+  }, []);
+
+  useEffect(() => {
+    void reloadReminderSettings();
+  }, [reloadReminderSettings]);
+
+  const handleDefaultReminderChange = async (option: ReminderOption) => {
+    await setDefaultClassReminder(option);
+    setDefaultReminder(option);
+
+    const [posted, overrides] = await Promise.all([
+      getPostedCalendarEvents(),
+      getClassReminderOverrides(),
+    ]);
+    await syncClassReminderNotifications(posted, option, overrides);
+  };
 
   return (
     <View style={[styles.screen, { backgroundColor: t.bg }]}>
@@ -155,6 +186,33 @@ export default function Profile() {
             <ChevronRight color={t.muted} />
           </TouchableOpacity>
         </View>
+
+        <Text style={[styles.sectionTitle, { color: t.muted }]}>CLASS REMINDERS</Text>
+        <View style={[styles.card, { backgroundColor: t.card, borderColor: t.cardBorder }]}>
+          <View style={styles.reminderWrap}>
+            {CLASS_REMINDER_OPTIONS.map((option) => {
+              const selected = defaultReminder === option;
+              return (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.reminderChip,
+                    { backgroundColor: t.input, borderColor: t.divider },
+                    selected && { backgroundColor: t.accent + '22', borderColor: t.accent + '88' },
+                  ]}
+                  onPress={() => {
+                    void handleDefaultReminderChange(option);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.reminderChipText, { color: selected ? t.accent : t.muted }]}>
+                    {reminderOptionLabel(option)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
       </ScrollView>
 
       <BottomNav role="student" active="profile" />
@@ -188,4 +246,7 @@ const styles = StyleSheet.create({
   divider: { height: 1, marginHorizontal: 16 },
   actionRow: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 14 },
   actionLabel: { flex: 1, fontSize: 15, fontWeight: '500' },
+  reminderWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 16 },
+  reminderChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
+  reminderChipText: { fontSize: 12, fontWeight: '600' },
 });

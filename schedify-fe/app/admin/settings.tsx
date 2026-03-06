@@ -23,7 +23,7 @@ export default function SettingsScreen() {
       {
         text: 'Sign Out',
         style: 'destructive',
-        onPress: () => router.replace('/login' as any),
+        onPress: () => router.replace('/student/login' as any),
       },
     ]);
   };

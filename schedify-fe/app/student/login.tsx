@@ -49,7 +49,7 @@ const Login = () => {
       <StatusBar barStyle="light-content" backgroundColor="#2d3748" />
 
       <Image
-        source={require('../assets/images/logo.png')}
+        source={require('../../assets/images/logo.png')}
         style={styles.logo}
         resizeMode="contain"
       />
@@ -108,7 +108,7 @@ const Login = () => {
         <Text style={styles.buttonText}>Login</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={() => router.push('/signup' as any)}>
+      <TouchableOpacity onPress={() => router.push('/student/signup' as any)}>
         <Text style={styles.linkText}>Create an account</Text>
       </TouchableOpacity>
 

@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  View, Text,
-  StyleSheet, ScrollView, StatusBar,
+  View, Text, TouchableOpacity,
+  StyleSheet, ScrollView, StatusBar, Alert, Platform,
 } from 'react-native';
 import { ICONS } from '../../constants/icons';
 import { useTheme } from '../../ThemeContext';
 import BottomNav from '../../components/BottomNav';
+import { useFocusEffect } from '@react-navigation/native';
+import { getPostedCalendarEvents, deletePostedCalendarEvent } from '../../utils/scheduleStore';
 
 type TagType = 'course' | 'department' | 'university';
 type Schedule = {
@@ -17,36 +19,6 @@ type Schedule = {
   tagValue: string;
   reminders: string[];
 };
-
-const SAMPLE_SCHEDULES: Schedule[] = [
-  {
-    id: '1',
-    title: 'Midterm Examination',
-    date: '2026-03-28',
-    time: '08:00',
-    tag: 'course',
-    tagValue: 'BSIT',
-    reminders: ['1 Day Before'],
-  },
-  {
-    id: '2',
-    title: 'Foundation Day Celebration',
-    date: '2026-02-28',
-    time: '14:00',
-    tag: 'university',
-    tagValue: 'All',
-    reminders: ['1 Day Before'],
-  },
-  {
-    id: '3',
-    title: 'Department Meeting',
-    date: '2026-02-28',
-    time: '10:00',
-    tag: 'department',
-    tagValue: 'CICT',
-    reminders: ['1 Hour Before'],
-  },
-];
 
 // ── Tag colors — uses theme so light mode gets lighter tints ──
 function getTagColor(tag: TagType, isDark: boolean) {
@@ -103,16 +75,57 @@ function ReminderChip({ label }: { label: string }) {
 }
 
 // ── ScheduleCard — uses theme.card + theme.cardBorder ──
-function ScheduleCard({ item }: { item: Schedule }) {
+function ScheduleCard({ item, onDelete }: { item: Schedule; onDelete?: (id: string) => void }) {
   const { theme } = useTheme();
+
+  const confirmDelete = (title: string, id: string) => {
+    const message = `Are you sure you want to delete "${title}"?\n\nThis action cannot be undone.`;
+
+    if (Platform.OS === 'web') {
+      const confirmed = typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : true;
+      if (confirmed && onDelete) onDelete(id);
+      return;
+    }
+
+    Alert.alert(
+      'Delete Schedule',
+      message,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          onPress: () => {
+            if (onDelete) onDelete(id);
+          },
+          style: 'destructive',
+        },
+      ]
+    );
+  };
+
   return (
     <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
       <View style={styles.cardHeader}>
-        <Text style={[styles.cardTitle, { color: theme.text }]} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <TagBadge tag={item.tag} tagValue={item.tagValue} />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.cardTitle, { color: theme.text }]} numberOfLines={1}>
+            {item.title}
+          </Text>
+        </View>
+        {onDelete && (
+          <TouchableOpacity
+            activeOpacity={0.5}
+            onPress={() => {
+              console.log('DELETE BUTTON PRESSED for:', item.id, item.title);
+              console.log('Confirming delete for:', item.id);
+              confirmDelete(item.title, item.id);
+            }}
+            style={[styles.deleteBtn, { backgroundColor: theme.danger + '20' }]}
+          >
+            <Text style={[styles.deleteBtnText, { color: theme.danger }]}>{ICONS.actions.delete}</Text>
+          </TouchableOpacity>
+        )}
       </View>
+      <TagBadge tag={item.tag} tagValue={item.tagValue} />
       <Text style={[styles.cardDate, { color: theme.muted }]}>{item.date} · {item.time}</Text>
       <View style={styles.remindersRow}>
         {item.reminders.map((reminder, index) => (
@@ -140,11 +153,55 @@ function StatCard({ icon, value, label, color }: {
 // main
 export default function AdminDashboard() {
   const { theme, isDark } = useTheme();
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
 
-  const totalSchedules = SAMPLE_SCHEDULES.length;
-  const thisMonth      = SAMPLE_SCHEDULES.filter(s => s.date.startsWith('2026-02')).length;
-  const courseTags     = SAMPLE_SCHEDULES.filter(s => s.tag === 'course').length;
-  const deptTags       = SAMPLE_SCHEDULES.filter(s => s.tag === 'department').length;
+  const loadPostedEvents = async () => {
+    const posted = await getPostedCalendarEvents();
+    const items: Schedule[] = [];
+
+    posted.forEach((event) => {
+      const item: Schedule = {
+        id: event.id,
+        title: event.label,
+        date: event.date || '',
+        time: event.time || '',
+        tag: (event.department || event.org || 'Posted') as any,
+        tagValue: event.org || event.department || 'Posted',
+        reminders: [],
+      };
+      items.unshift(item);
+    });
+
+    setSchedules(items);
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadPostedEvents();
+    }, [])
+  );
+
+  const handleDelete = async (id: string) => {
+    try {
+      console.log('=== DELETE START ===');
+      console.log('Deleting item with id:', id);
+      console.log('Current schedules state:', schedules);
+      
+      await deletePostedCalendarEvent(id);
+      console.log('Item deleted from storage');
+      
+      await loadPostedEvents();
+      console.log('Events reloaded, new schedules state:', schedules);
+      console.log('=== DELETE COMPLETE ===');
+    } catch (error) {
+      console.error('Delete failed:', error);
+    }
+  };
+
+  const totalSchedules = schedules.length;
+  const thisMonth      = schedules.filter(s => s.date.startsWith('2026-03')).length;
+  const courseTags     = schedules.filter(s => s.tag === 'course').length;
+  const deptTags       = schedules.filter(s => s.tag === 'department').length;
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.bg }]}>
@@ -175,8 +232,8 @@ export default function AdminDashboard() {
        
         <Text style={[styles.sectionTitle, { color: theme.muted }]}>RECENT POSTS</Text>
 
-        {SAMPLE_SCHEDULES.map(schedule => (
-          <ScheduleCard key={schedule.id} item={schedule} />
+        {schedules.map(schedule => (
+          <ScheduleCard key={schedule.id} item={schedule} onDelete={handleDelete} />
         ))}
 
         <View style={{ height: 20 }} />
@@ -218,5 +275,8 @@ const styles = StyleSheet.create({
   tagBadge: { flexDirection: 'row', alignItems: 'center', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, gap: 4 },
   tagIcon:  { fontSize: 11 },
   tagText:  { fontSize: 11, fontWeight: '700' },
+  
+  deleteBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  deleteBtnText: { fontSize: 16, fontWeight: '700' },
 
 });

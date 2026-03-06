@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, StatusBar, Modal } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, StatusBar, Modal, Alert, Keyboard } from 'react-native';
 import { ICONS } from '../../constants/icons';
 import { useTheme } from '../../ThemeContext';
 import BottomNav from '../../components/BottomNav';
+import { addPostedCalendarEvent } from '../../utils/scheduleStore';
 
 type PostType = 'class' | 'event' | 'suspension';
 
@@ -12,6 +13,7 @@ type Subject = {
   day: string;
   time: string;
   room: string;
+  building: string;
   professor: string;
 };
 
@@ -123,17 +125,15 @@ function ReminderSelector({ accentColor }: { accentColor: string }) {
 }
 function ClassScheduleForm() {
   const { theme, isDark } = useTheme();
-  const [dept, setDept]         = useState('CICT');
-  const [course, setCourse]     = useState('BSIT');
-  const [year, setYear]         = useState('2nd Year');
-  const [block, setBlock]       = useState('2A');
-  const [semester, setSemester] = useState('First Semester 2025-2026');
+  const [isPosting, setIsPosting] = useState(false);
+  const [postStatus, setPostStatus] = useState('');
+  const [dept, setDept]         = useState('');
+  const [course, setCourse]     = useState('');
+  const [year, setYear]         = useState('');
+  const [block, setBlock]       = useState('');
+  const [semester, setSemester] = useState('');
   const [subjects, setSubjects] = useState<Subject[]>([
-    { id: '1', name: 'Programming',     day: 'Monday',    time: '8:00am - 10:00am',  room: 'Lab 1',    professor: '' },
-    { id: '2', name: 'Mathematics',     day: 'Tuesday',   time: '1:00pm - 3:00pm',   room: 'Room 201', professor: '' },
-    { id: '3', name: 'Networks',        day: 'Wednesday', time: '8:00am - 10:00am',  room: 'Lab 2',    professor: '' },
-    { id: '4', name: 'PE',              day: 'Thursday',  time: '3:00pm - 5:00pm',   room: 'Gym',      professor: '' },
-    { id: '5', name: 'Web Development', day: 'Friday',    time: '10:00am - 12:00pm', room: 'Lab 3',    professor: '' },
+    { id: String(Date.now()), name: '', day: 'Monday', time: '', room: '', building: '', professor: '' },
   ]);
 
   const audienceTag = `${course} ${block}`;
@@ -142,10 +142,87 @@ function ClassScheduleForm() {
     setSubjects(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
   };
   const addSubject = () => {
-    setSubjects(prev => [...prev, { id: String(Date.now()), name: '', day: 'Monday', time: '8:00am - 10:00am', room: '', professor: '' }]);
+    setSubjects(prev => [...prev, { id: String(Date.now()), name: '', day: 'Monday', time: '', room: '', building: '', professor: '' }]);
   };
   const removeSubject = (id: string) => {
     setSubjects(prev => prev.filter(s => s.id !== id));
+  };
+
+  const dayLabelToIndex = (value: string): number | null => {
+    const day = value.trim().toLowerCase();
+    if (day.startsWith('mon')) return 1;
+    if (day.startsWith('tue')) return 2;
+    if (day.startsWith('wed')) return 3;
+    if (day.startsWith('thu')) return 4;
+    if (day.startsWith('fri')) return 5;
+    return null;
+  };
+
+  const toIsoDate = (date: Date): string => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  const nextDateForDay = (targetDay: number): string => {
+    const today = new Date();
+    const current = today.getDay();
+    const diff = (targetDay - current + 7) % 7;
+    const next = new Date(today);
+    next.setDate(today.getDate() + diff);
+    return toIsoDate(next);
+  };
+
+  const handlePostClassSchedule = async () => {
+    if (isPosting) return;
+    setIsPosting(true);
+    setPostStatus('Posting class schedule...');
+
+    try {
+      const validSubjects = subjects
+        .map((s) => ({
+          ...s,
+          name: s.name.trim(),
+          time: s.time.trim(),
+          room: s.room.trim(),
+          building: s.building.trim(),
+          professor: s.professor.trim(),
+        }))
+        .filter((s) => s.name);
+
+      if (validSubjects.length === 0) {
+        Alert.alert('Missing subject name', 'Please provide at least one subject name before posting.');
+        setPostStatus('Please provide at least one subject name.');
+        return;
+      }
+
+      for (const subject of validSubjects) {
+        const targetDay = dayLabelToIndex(subject.day);
+        if (targetDay === null) continue;
+
+        await addPostedCalendarEvent({
+          date: nextDateForDay(targetDay),
+          label: `${subject.name} (${course} ${block})`,
+          type: 'class',
+          time: subject.time || undefined,
+          room: subject.room || undefined,
+          building: subject.building || undefined,
+          department: dept,
+          org: subject.professor || undefined,
+          description: `${year} • ${semester}`,
+        });
+      }
+
+      Alert.alert('Posted', `Class schedule posted with ${validSubjects.length} subject${validSubjects.length > 1 ? 's' : ''}.`);
+      setPostStatus(`Posted ${validSubjects.length} subject${validSubjects.length > 1 ? 's' : ''}.`);
+    } catch (error) {
+      Alert.alert('Post failed', 'Could not save class schedule. Please try again.');
+      console.error('Failed to post class schedule:', error);
+      setPostStatus('Post failed. Check console and try again.');
+    } finally {
+      setIsPosting(false);
+    }
   };
 
   const tagBg     = isDark ? '#1a1a3a' : '#ede9fe';
@@ -165,27 +242,35 @@ function ClassScheduleForm() {
       <View style={styles.row2}>
         <View style={styles.col}>
           <Text style={[styles.label, { color: theme.muted }]}>DEPARTMENT</Text>
-          <Dropdown value={dept} options={DEPARTMENTS} onSelect={v => { setDept(v); setCourse(COURSES[v][0]); }} />
+          <Dropdown
+            value={dept}
+            options={DEPARTMENTS}
+            placeholder="Select department"
+            onSelect={v => {
+              setDept(v);
+              setCourse(COURSES[v]?.[0] ?? '');
+            }}
+          />
         </View>
         <View style={styles.col}>
           <Text style={[styles.label, { color: theme.muted }]}>COURSE</Text>
-          <Dropdown value={course} options={COURSES[dept] || []} onSelect={setCourse} />
+          <Dropdown value={course} options={COURSES[dept] || []} placeholder="Select course" onSelect={setCourse} />
         </View>
       </View>
 
       <View style={styles.row2}>
         <View style={styles.col}>
           <Text style={[styles.label, { color: theme.muted }]}>YEAR LEVEL</Text>
-          <Dropdown value={year} options={YEAR_LEVELS} onSelect={setYear} />
+          <Dropdown value={year} options={YEAR_LEVELS} placeholder="Select year level" onSelect={setYear} />
         </View>
         <View style={styles.col}>
           <Text style={[styles.label, { color: theme.muted }]}>BLOCK / SECTION</Text>
-          <Dropdown value={block} options={BLOCKS} onSelect={setBlock} />
+          <Dropdown value={block} options={BLOCKS} placeholder="Select block" onSelect={setBlock} />
         </View>
       </View>
 
       <Text style={[styles.label, { color: theme.muted }]}>SEMESTER</Text>
-      <Dropdown value={semester} options={SEMESTERS} onSelect={setSemester} />
+      <Dropdown value={semester} options={SEMESTERS} placeholder="Select semester" onSelect={setSemester} />
       <View style={{ height: 16 }} />
 
       <Text style={[styles.label, { color: theme.muted }]}>TARGET AUDIENCE TAG</Text>
@@ -221,16 +306,19 @@ function ClassScheduleForm() {
             placeholder="Professor name" placeholderTextColor={theme.muted}
           />
           <View style={styles.subjectRow}>
-            <View style={{ flex: 1.2 }}>
+            <View style={{ flex: 1 }}>
               <Dropdown value={subj.day.slice(0, 4)} options={DAYS.map(d => d.slice(0, 4))} onSelect={v => updateSubject(subj.id, 'day', v)} />
             </View>
-            <View style={{ flex: 1.8, marginHorizontal: 6 }}>
+            <View style={{ flex: 1 }}>
               <TextInput
                 style={[styles.roomInput, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text }]}
                 value={subj.time} onChangeText={v => updateSubject(subj.id, 'time', v)}
-                placeholder="e.g. 8:00am - 10:00am" placeholderTextColor={theme.muted}
+                placeholder="Time range" placeholderTextColor={theme.muted}
               />
             </View>
+          </View>
+
+          <View style={styles.subjectRow}>
             <View style={{ flex: 1 }}>
               <TextInput
                 style={[styles.roomInput, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text }]}
@@ -238,16 +326,35 @@ function ClassScheduleForm() {
                 placeholder="Room" placeholderTextColor={theme.muted}
               />
             </View>
+            <View style={{ flex: 1 }}>
+              <TextInput
+                style={[styles.roomInput, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text }]}
+                value={subj.building}
+                onChangeText={v => updateSubject(subj.id, 'building', v)}
+                placeholder="Building"
+                placeholderTextColor={theme.muted}
+              />
+            </View>
           </View>
         </View>
       ))}
 
-      <TouchableOpacity style={[styles.saveBtn, { backgroundColor: isDark ? '#0f2a1a' : '#dcfce7', borderColor: isDark ? '#22c55e55' : '#86efac' }]}>
+      <TouchableOpacity
+        style={[styles.saveBtn, { backgroundColor: isDark ? '#0f2a1a' : '#dcfce7', borderColor: isDark ? '#22c55e55' : '#86efac' }]}
+        disabled={isPosting}
+        onPress={() => {
+          Keyboard.dismiss();
+          void handlePostClassSchedule();
+        }}
+      >
         <Text style={styles.saveBtnIcon}></Text>
         <Text style={[styles.saveBtnText, { color: isDark ? '#4ade80' : '#16a34a' }]}>
-          Save & Post Schedule for {audienceTag}
+          {isPosting ? 'Posting...' : `Save & Post Schedule for ${audienceTag}`}
         </Text>
       </TouchableOpacity>
+      {!!postStatus && (
+        <Text style={[styles.postStatusText, { color: theme.muted }]}>{postStatus}</Text>
+      )}
     </>
   );
 }
@@ -273,6 +380,48 @@ function EventSuspensionForm({ type }: { type: 'event' | 'suspension' }) {
 
   const tagOptions = ['All Students', 'BSIT', 'BSCS', 'BSIS', 'BTVTED', 'BSA', 'BSAIS', 'BSE', 'BPA', 'CICT Dept', 'CBME Dept'];
 
+  const handlePost = async () => {
+    const safeTitle = title.trim();
+    const safeDate = date.trim();
+    const safeTag = tag.trim();
+
+    if (!safeTitle || !safeDate) {
+      Alert.alert('Missing required fields', 'Please provide at least title and date.');
+      return;
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(safeDate)) {
+      Alert.alert('Invalid date format', 'Use YYYY-MM-DD format.');
+      return;
+    }
+
+    const composedTime = type === 'event'
+      ? [startTime.trim(), endTime.trim()].filter(Boolean).join(' - ')
+      : startTime.trim();
+
+    await addPostedCalendarEvent({
+      date: safeDate,
+      label: safeTitle,
+      type,
+      time: composedTime || undefined,
+      room: room.trim() || undefined,
+      building: building.trim() || undefined,
+      department: safeTag || undefined,
+      org: safeTag || undefined,
+      description: description.trim() || undefined,
+    });
+
+    Alert.alert('Posted', `${type === 'event' ? 'Event' : 'Suspension'} added to calendar.`);
+    setTitle('');
+    setDesc('');
+    setRoom('');
+    setBuilding('');
+    setDate('');
+    setStartTime('');
+    setEndTime('');
+    setTag('');
+  };
+
   return (
     <View style={[styles.eventForm, { backgroundColor: formBg, borderColor: formBorder }]}>
       <Text style={[styles.sectionHeader, { color: theme.title }]}>Event Info</Text>
@@ -281,7 +430,7 @@ function EventSuspensionForm({ type }: { type: 'event' | 'suspension' }) {
       <TextInput
         style={[styles.input, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text }]}
         value={title} onChangeText={setTitle}
-        placeholder={type === 'event' ? 'e.g. Foundation Day Celebration' : 'e.g. No Classes - Bad Weather'}
+        placeholder={type === 'event' ? 'Enter event title' : 'Enter suspension title'}
         placeholderTextColor={theme.muted}
       />
 
@@ -298,12 +447,12 @@ function EventSuspensionForm({ type }: { type: 'event' | 'suspension' }) {
           <View style={styles.col}>
             <Text style={[styles.label, { color: theme.muted }]}>ROOM</Text>
             <TextInput style={[styles.input, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text }]}
-              value={room} onChangeText={setRoom} placeholder="e.g. Gymnasium" placeholderTextColor={theme.muted} />
+              value={room} onChangeText={setRoom} placeholder="Enter venue" placeholderTextColor={theme.muted} />
           </View>
           <View style={styles.col}>
             <Text style={[styles.label, { color: theme.muted }]}>BUILDING</Text>
             <TextInput style={[styles.input, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text }]}
-              value={building} onChangeText={setBuilding} placeholder="e.g. Main Campus" placeholderTextColor={theme.muted} />
+              value={building} onChangeText={setBuilding} placeholder="Enter location" placeholderTextColor={theme.muted} />
           </View>
         </View>
       )}
@@ -312,20 +461,20 @@ function EventSuspensionForm({ type }: { type: 'event' | 'suspension' }) {
       <TextInput
         style={[styles.input, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text }]}
         value={date} onChangeText={setDate}
-        placeholder="YYYY-MM-DD  (e.g. 2026-02-25)" placeholderTextColor={theme.muted} keyboardType="numeric"
+        placeholder="YYYY-MM-DD" placeholderTextColor={theme.muted} keyboardType="numeric"
       />
 
       <View style={styles.row2}>
         <View style={styles.col}>
           <Text style={[styles.label, { color: theme.muted }]}>START TIME</Text>
           <TextInput style={[styles.input, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text }]}
-            value={startTime} onChangeText={setStartTime} placeholder="e.g. 08:00 AM" placeholderTextColor={theme.muted} />
+            value={startTime} onChangeText={setStartTime} placeholder="Start time" placeholderTextColor={theme.muted} />
         </View>
         {type === 'event' && (
           <View style={styles.col}>
             <Text style={[styles.label, { color: theme.muted }]}>END TIME</Text>
             <TextInput style={[styles.input, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text }]}
-              value={endTime} onChangeText={setEndTime} placeholder="e.g. 05:00 PM" placeholderTextColor={theme.muted} />
+              value={endTime} onChangeText={setEndTime} placeholder="End time" placeholderTextColor={theme.muted} />
           </View>
         )}
       </View>
@@ -345,7 +494,13 @@ function EventSuspensionForm({ type }: { type: 'event' | 'suspension' }) {
       <Text style={[styles.label, { color: theme.muted }]}>NOTIFICATION REMINDERS</Text>
       <ReminderSelector accentColor={accentColor} />
 
-      <TouchableOpacity style={[styles.saveBtn, { backgroundColor: accentBg, borderColor: accentColor + '66' }]}>
+      <TouchableOpacity
+        style={[styles.saveBtn, { backgroundColor: accentBg, borderColor: accentColor + '66' }]}
+        onPress={() => {
+          Keyboard.dismiss();
+          void handlePost();
+        }}
+      >
         <Text style={styles.saveBtnIcon}>{type === 'event' ? ICONS.postTypes.event : ICONS.postTypes.suspension}</Text>
         <Text style={[styles.saveBtnText, { color: accentColor }]}>
           Post {type === 'event' ? 'Event' : 'Suspension Notice'}
@@ -374,7 +529,7 @@ export default function PostScheduleScreen() {
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+        keyboardShouldPersistTaps="always"
       >
         <Text style={[styles.pageTitle, { color: theme.title }]}>Post New Schedule</Text>
 
@@ -419,7 +574,7 @@ export default function PostScheduleScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingTop: 52, paddingBottom: 12 },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 52, paddingBottom: 120 },
 
   pageTitle: { fontSize: 24, fontWeight: '700', letterSpacing: 0.5, marginBottom: 24 },
 
@@ -447,7 +602,7 @@ const styles = StyleSheet.create({
   subjectLabel: { fontSize: 12, fontWeight: '700' },
   deleteBtn: { fontSize: 11 },
   subjectNameInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, fontSize: 14, marginBottom: 10 },
-  subjectRow: { flexDirection: 'row', alignItems: 'center' },
+  subjectRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   roomInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 9, fontSize: 13 },
 
   eventForm: { borderRadius: 14, padding: 16, borderWidth: 1 },
@@ -460,5 +615,6 @@ const styles = StyleSheet.create({
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 14, paddingVertical: 16, marginTop: 20, gap: 10, borderWidth: 1 },
   saveBtnIcon: { fontSize: 18 },
   saveBtnText: { fontSize: 14, fontWeight: '700' },
+  postStatusText: { marginTop: 10, fontSize: 12 },
 
 });

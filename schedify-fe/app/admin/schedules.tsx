@@ -2,11 +2,13 @@ import React, { useState, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, StatusBar, Animated, LayoutAnimation,
-  Platform, UIManager,
+  Platform, UIManager, Alert,
 } from 'react-native';
 import { ICONS } from '../../constants/icons';
 import { useTheme } from '../../ThemeContext';
 import BottomNav from '../../components/BottomNav';
+import { useFocusEffect } from '@react-navigation/native';
+import { getPostedCalendarEvents, deletePostedCalendarEvent } from '../../utils/scheduleStore';
 
 if (Platform.OS === 'android') {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
@@ -30,36 +32,28 @@ const DATA: Record<PostType, { label: string; color: string; textColor: string; 
     label: 'Class Schedules',
     color: '#4ade80',
     textColor: '#0f172a',
-    items: [
-      { id: 'c1', title: 'Software Engineering', tag: 'BSCS 3-2', date: 'Mar 5', time: '7:00 AM – 10:00 AM', room: 'Room 5', organization: 'CCB' },
-      { id: 'c2', title: 'Data Structures',      tag: 'BSIT 2-1', date: 'Mar 6', time: '10:00 AM – 1:00 PM', room: 'Lab 2', organization: 'CICT' },
-    ],
+    items: [],
   },
   suspension: {
     label: 'Suspensions',
     color: '#ef4444',
     textColor: '#ffffff',
-    items: [
-      { id: 's1', title: 'Class Suspension', tag: 'All', date: 'Mar 1', description: 'Non-working holiday' },
-    ],
+    items: [],
   },
   event: {
     label: 'Events',
     color: '#3b82f6',
     textColor: '#ffffff',
-    items: [
-      { id: 'e1', title: 'CICT Week',       tag: 'CICT Students', date: 'Feb 26 - Mar 2', time: '8:00 AM', description: 'Week full of fun and exciting events!' },
-      { id: 'e2', title: 'Foundation Day',  tag: 'All Students',  date: 'Feb 28',          time: '2:00 PM – 5:00 PM', organization: 'Main Campus' },
-    ],
+    items: [],
   },
 };
 
 
-function AccordionSection({ type }: { type: PostType }) {
-  const { theme, isDark } = useTheme();
+function AccordionSection({ type, items, onDelete }: { type: PostType; items: ScheduleItem[]; onDelete?: (id: string) => void }) {
+  const { theme } = useTheme();
   const [open, setOpen] = useState(false);
   const rotateAnim = useRef(new Animated.Value(0)).current;
-  const { label, color, textColor, items } = DATA[type];
+  const { label, color, textColor } = DATA[type];
 
   const toggle = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -78,6 +72,31 @@ function AccordionSection({ type }: { type: PostType }) {
   const itemBg   = theme.bg;
   const metaColor = theme.subtitle;
   const descColor = theme.muted;
+
+  const confirmDelete = (title: string, id: string) => {
+    const message = `Are you sure you want to delete "${title}"?\n\nThis action cannot be undone.`;
+
+    if (Platform.OS === 'web') {
+      const confirmed = typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : true;
+      if (confirmed && onDelete) onDelete(id);
+      return;
+    }
+
+    Alert.alert(
+      'Delete Schedule',
+      message,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          onPress: () => {
+            if (onDelete) onDelete(id);
+          },
+          style: 'destructive',
+        },
+      ]
+    );
+  };
 
   return (
     <View style={acc.wrapper}>
@@ -127,6 +146,18 @@ function AccordionSection({ type }: { type: PostType }) {
                     </Text>
                   )}
                 </View>
+
+                <TouchableOpacity
+                  activeOpacity={0.5}
+                  onPress={() => {
+                    console.log('DELETE BUTTON PRESSED for:', item.id, item.title);
+                    console.log('Confirming delete for:', item.id);
+                    confirmDelete(item.title, item.id);
+                  }}
+                  style={[acc.deleteBtn, { backgroundColor: theme.danger + '20' }]}
+                >
+                  <Text style={[acc.deleteBtnText, { color: theme.danger }]}>{ICONS.actions.delete}</Text>
+                </TouchableOpacity>
               </View>
             ))
           )}
@@ -174,12 +205,80 @@ const acc = StyleSheet.create({
   tagBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start', marginBottom: 4 },
   tagText: { fontSize: 10, fontWeight: '700' },
   itemDesc: { fontSize: 11, marginTop: 4, fontStyle: 'italic', lineHeight: 16 },
+  deleteBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  deleteBtnText: { fontSize: 16, fontWeight: '700' },
 });
 
 //  Main Screen 
 export default function SchedulesScreen() {
   const { theme, isDark } = useTheme();
   const typeOrder: PostType[] = ['class', 'event', 'suspension'];
+  const [data, setData] = useState<Record<PostType, ScheduleItem[]>>({
+    class: [],
+    event: [],
+    suspension: [],
+  });
+
+  const loadPostedEvents = async () => {
+    try {
+      const posted = await getPostedCalendarEvents();
+      console.log('Loaded posted events:', posted);
+      const newData: Record<PostType, ScheduleItem[]> = {
+        class: [],
+        event: [],
+        suspension: [],
+      };
+      
+      posted.forEach((event) => {
+        const formattedDate = event.date
+          ? event.date.split('-').slice(1).join('-').replace('-', ' ').replace(/^0/, '')
+          : undefined;
+        
+        const item: ScheduleItem = {
+          id: event.id,
+          title: event.label,
+          tag: event.department || event.org || 'Posted',
+          date: formattedDate,
+          time: event.time,
+          room: event.room,
+          organization: event.org,
+          description: event.description,
+        };
+        
+        if (newData[event.type]) {
+          newData[event.type].unshift(item);
+        }
+      });
+      
+      console.log('Data after load:', newData);
+      setData(newData);
+    } catch (error) {
+      console.error('Error loading events:', error);
+    }
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadPostedEvents();
+    }, [])
+  );
+
+  const handleDelete = async (id: string) => {
+    try {
+      console.log('=== DELETE START ===');
+      console.log('Deleting item with id:', id);
+      console.log('Current data state:', data);
+      
+      await deletePostedCalendarEvent(id);
+      console.log('Item deleted from storage');
+      
+      await loadPostedEvents();
+      console.log('Events reloaded, new data state:', data);
+      console.log('=== DELETE COMPLETE ===');
+    } catch (error) {
+      console.error('Delete failed:', error);
+    }
+  };
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.bg }]}>
@@ -193,7 +292,7 @@ export default function SchedulesScreen() {
         <Text style={[styles.pageTitle, { color: theme.title }]}>All Schedules Posted</Text>
 
         {typeOrder.map(type => (
-          <AccordionSection key={type} type={type} />
+          <AccordionSection key={type} type={type} items={data[type]} onDelete={handleDelete} />
         ))}
 
         <View style={{ height: 24 }} />
