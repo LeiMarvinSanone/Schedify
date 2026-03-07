@@ -1,5 +1,5 @@
 import Schedule from '../models/Schedule.js';
-import User from '../models/user.js';
+import User from '../models/User.js';
 
 // CREATE schedule (admin only)
 export const createSchedule = async (req, res) => {
