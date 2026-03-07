@@ -9,8 +9,8 @@ import { Picker } from '@react-native-picker/picker';
 type Role = 'Student' | 'Professor';
 
 const COURSES: Record<string, string[]> = {
-  CICT: ['BSIT', 'BSCS', 'BSIS','BTVTED'],
-  CBME: ['BSA', 'BSAIS', 'BSE','BPA'],
+  CICT: ['BSIT', 'BSCS', 'BSIS', 'BTVTED'],
+  CBME: ['BSA', 'BSAIS', 'BSE', 'BPA'],
 };
 
 const DEPARTMENTS = Object.keys(COURSES);
@@ -42,7 +42,7 @@ const SignUp = () => {
     try {
       await new Promise(resolve => setTimeout(resolve, 300));
       Alert.alert('Success', 'Account created! Please login.');
-      router.replace('/login' as any);
+      router.replace('/student/login' as any);
     } catch {
       Alert.alert('Error', 'Failed. Please try again.');
     }
@@ -56,10 +56,11 @@ const SignUp = () => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Header: logo + app name */}
+
+        
         <View style={styles.header}>
           <Image
-            source={require('../assets/images/logo.png')}
+            source={require('../../assets/images/logo.png')}
             style={styles.logo}
             resizeMode="contain"
           />
@@ -70,7 +71,7 @@ const SignUp = () => {
           </Text>
         </View>
 
-        {/* Name */}
+        
         <Text style={styles.label}>Name</Text>
         <TextInput
           style={styles.input}
@@ -80,7 +81,6 @@ const SignUp = () => {
           placeholderTextColor="#8a9bb0"
         />
 
-        {/* Sorsu Email */}
         <Text style={styles.label}>Sorsu Email</Text>
         <TextInput
           style={styles.input}
@@ -92,7 +92,7 @@ const SignUp = () => {
           autoCapitalize="none"
         />
 
-        {/* Password */}
+
         <Text style={styles.label}>Password</Text>
         <TextInput
           style={styles.input}
@@ -103,7 +103,6 @@ const SignUp = () => {
           secureTextEntry
         />
 
-        {/* ID No. */}
         <Text style={styles.label}>ID no.</Text>
         <TextInput
           style={styles.input}
@@ -114,7 +113,6 @@ const SignUp = () => {
           keyboardType="numeric"
         />
 
-        {/* Department + Course side by side */}
         <View style={styles.row}>
           <View style={styles.half}>
             <Text style={styles.label}>Department</Text>
@@ -123,14 +121,14 @@ const SignUp = () => {
                 selectedValue={formData.department}
                 onValueChange={val => {
                   update('department', val);
-                  update('course', '');
+                  update('course', ''); 
                 }}
                 style={styles.picker}
                 dropdownIconColor="#8a9bb0"
               >
-                <Picker.Item label="Select Department" value="" color="#8a9bb0" />
+                <Picker.Item label="Select Department" value="" color="#999" />
                 {DEPARTMENTS.map(d => (
-                  <Picker.Item key={d} label={d} value={d} color="#fff" />
+                  <Picker.Item key={d} label={d} value={d} color="#333" />
                 ))}
               </Picker>
             </View>
@@ -146,16 +144,15 @@ const SignUp = () => {
                 dropdownIconColor="#8a9bb0"
                 enabled={!!formData.department}
               >
-                <Picker.Item label="Select Course" value="" color="#8a9bb0" />
+                <Picker.Item label="Select Course" value="" color="#999" />
                 {(COURSES[formData.department] || []).map(c => (
-                  <Picker.Item key={c} label={c} value={c} color="#fff" />
+                  <Picker.Item key={c} label={c} value={c} color="#333" />
                 ))}
               </Picker>
             </View>
           </View>
         </View>
 
-        {/* Block */}
         <Text style={styles.label}>Block</Text>
         <View style={[styles.pickerWrapper, styles.blockPickerWidth]}>
           <Picker
@@ -164,14 +161,13 @@ const SignUp = () => {
             style={styles.picker}
             dropdownIconColor="#8a9bb0"
           >
-            <Picker.Item label="Select Block" value="" color="#8a9bb0" />
+            <Picker.Item label="Select Block" value="" color="#999" />
             {BLOCKS.map(b => (
-              <Picker.Item key={b} label={b} value={b} color="#fff" />
+              <Picker.Item key={b} label={b} value={b} color="#333" />
             ))}
           </Picker>
         </View>
 
-        {/* Role radio buttons */}
         <View style={styles.roleRow}>
           <View style={styles.roleTag}>
             <Text style={styles.roleTagText}>Role</Text>
@@ -191,15 +187,13 @@ const SignUp = () => {
           ))}
         </View>
 
-        {/* Sign Up Button */}
         <TouchableOpacity style={styles.button} onPress={handleSubmit} activeOpacity={0.85}>
           <Text style={styles.buttonText}>Sign up</Text>
         </TouchableOpacity>
 
-        {/* Back to login */}
         <View style={styles.loginRow}>
           <Text style={styles.loginText}>Already have an account? </Text>
-          <TouchableOpacity onPress={() => router.push('/login' as any)}>
+          <TouchableOpacity onPress={() => router.push('/student/login' as any)}>
             <Text style={styles.linkText}>Login</Text>
           </TouchableOpacity>
         </View>
@@ -267,7 +261,7 @@ const styles = StyleSheet.create({
   pickerWrapper: {
     backgroundColor: '#5a6778',
     borderRadius: 8,
-    overflow: 'hidden',
+    paddingHorizontal: 4,
   },
   pickerDisabled: {
     opacity: 0.5,
@@ -277,8 +271,8 @@ const styles = StyleSheet.create({
   },
   picker: {
     color: '#ffffff',
-    backgroundColor: '#5a6778',
-    height: 48,
+    backgroundColor: 'transparent',
+    height: 52,
   },
   roleRow: {
     flexDirection: 'row',

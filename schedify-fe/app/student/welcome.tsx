@@ -16,7 +16,7 @@ export default function WelcomeScreen() {
       {/* Logo */}
       <View style={styles.logoContainer}>
         <Image
-          source={require('../assets/images/logo.png')}
+          source={require('../../assets/images/logo.png')}
           style={styles.logo}
           resizeMode="contain"
         />
@@ -30,7 +30,7 @@ export default function WelcomeScreen() {
       {/* Get Started Button */}
       <TouchableOpacity
         style={styles.button}
-        onPress={() => router.push('/login' as any)}
+        onPress={() => router.push('/student/login' as any)}
         activeOpacity={0.8}
       >
         <Text style={styles.buttonText}>Get Started</Text>

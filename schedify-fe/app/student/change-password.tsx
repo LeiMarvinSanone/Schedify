@@ -1,31 +1,13 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Alert, StatusBar, ScrollView,
+  StyleSheet, Alert, StatusBar, ScrollView, Image,
 } from 'react-native';
 import { router } from 'expo-router';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 
-// Full Schedify Shield Logo (larger, colored)
-const ShieldLogo = () => (
-  <Svg width="90" height="90" viewBox="0 0 42 42" fill="none">
-    <Path
-      d="M21 2L4 9v11c0 10.5 7.3 20.3 17 23 9.7-2.7 17-12.5 17-23V9L21 2z"
-      fill="#3a5a3a"
-      stroke="#4a9d5f"
-      strokeWidth="1.5"
-    />
-    {/* Open book */}
-    <Path d="M13 13h7v14h-7z" fill="none" stroke="#a0d080" strokeWidth="1.2" strokeLinejoin="round" />
-    <Path d="M20 13h7v14h-7z" fill="none" stroke="#a0d080" strokeWidth="1.2" strokeLinejoin="round" />
-    <Path d="M20 13v14" stroke="#a0d080" strokeWidth="1.2" />
-    {/* Pen/quill on top */}
-    <Path d="M24 10l4 4-6 6-2-2 4-8z" fill="#a0d080" stroke="#a0d080" strokeWidth="0.5" />
-    <Path d="M16 27c2-1 4.5-1 7 0s4.5 1 7 0" stroke="#a0d080" strokeWidth="1.2" strokeLinecap="round" />
-  </Svg>
-);
 
-// Back arrow icon
+
 const BackIcon = () => (
   <Svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <Path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="#e2e8f0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -75,23 +57,20 @@ export default function ChangePassword() {
       <StatusBar barStyle="light-content" backgroundColor="#2d3748" />
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
 
-        {/* Back Button */}
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7}>
           <BackIcon />
         </TouchableOpacity>
 
-        {/* Logo */}
-        <View style={styles.logoContainer}>
-          <ShieldLogo />
-        </View>
-
-        {/* Brand Name */}
+        <Image
+          source={require('../../assets/images/logo.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
         <Text style={styles.brandName}>
           <Text style={styles.brandBold}>Sc</Text>
           <Text style={styles.brandLight}>hedify</Text>
         </Text>
 
-        {/* Form */}
         <View style={styles.form}>
           {fields.map(field => (
             <View key={field.key} style={styles.inputGroup}>
@@ -109,10 +88,9 @@ export default function ChangePassword() {
           ))}
         </View>
 
-        {/* Update Button */}
         <TouchableOpacity style={styles.button} onPress={handleUpdate} activeOpacity={0.85}>
           <Text style={styles.buttonTextBold}>Update </Text>
-          <Text style={styles.buttonTextLight}>Password</Text>
+          <Text style={styles.buttonTextBold}>Password</Text>
         </TouchableOpacity>
 
       </ScrollView>
@@ -136,8 +114,10 @@ const styles = StyleSheet.create({
     padding: 8,
     marginBottom: 12,
   },
-  logoContainer: {
-    marginBottom: 12,
+  logo: {
+    width: 110,
+    height: 110,
+    marginBottom: 14,
   },
   brandName: {
     fontSize: 30,

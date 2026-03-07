@@ -63,8 +63,18 @@ const ThemeContext = createContext<ThemeContextType>({
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [isDark, setIsDark] = useState(true);
 
-  const toggleTheme = () => setIsDark(prev => !prev);
+  const toggleTheme = () => {
+    setIsDark(prev => {
+      const newValue = !prev;
+      console.log('🎨 Theme toggled:', prev ? 'DARK→LIGHT' : 'LIGHT→DARK');
+      console.log('🎨 New isDark value:', newValue);
+      return newValue;
+    });
+  };
+
   const theme = isDark ? DARK : LIGHT;
+
+  console.log('🎨 ThemeProvider render, isDark:', isDark);
 
   return (
     <ThemeContext.Provider value={{ isDark, toggleTheme, theme }}>
@@ -76,5 +86,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useTheme() {
-  return useContext(ThemeContext);
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error('useTheme must be used within ThemeProvider');
+  }
+  return context;
 }

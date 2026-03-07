@@ -1,11 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, StatusBar, TextInput,
-  Dimensions, Modal, Animated,
+  Dimensions, Modal, Animated, FlatList,
 } from 'react-native';
-import { router } from 'expo-router';
 import { useTheme } from '../../ThemeContext';
+import { ICONS } from '../../constants/icons';
+import BottomNav from '../../components/BottomNav';
+import { useFocusEffect } from '@react-navigation/native';
+import { getPostedCalendarEvents, subscribeScheduleChanges } from '../../utils/scheduleStore';
 
 const { width } = Dimensions.get('window');
 
@@ -21,25 +24,37 @@ const EVENT_COLORS_LIGHT = {
 };
 
 const TYPE_LABELS: Record<EventType, string> = { class: 'Class', suspension: 'Suspension', event: 'Event' };
-const TYPE_ICONS: Record<EventType, string>  = { class: '📘', suspension: '🚫', event: '🎉' };
+const TYPE_ICONS: Record<EventType, string>  = { class: ICONS.postTypes.class, suspension: ICONS.postTypes.suspension, event: ICONS.postTypes.event };
 
 type EventType = 'class' | 'suspension' | 'event';
 type ViewType  = 'Month' | 'Year' | 'Week';
 
 interface CalEvent {
   label: string; type: EventType;
-  time?: string; room?: string; org?: string; description?: string;
+  time?: string; room?: string; building?: string; department?: string; org?: string; description?: string;
 }
 
-const EVENTS: Record<string, CalEvent[]> = {
-  '2026-02-24': [{ label: 'IT101 Lec', type: 'class', time: '7:30 AM - 9:00 AM', room: 'Room 301', org: 'CICT Dept' }],
-  '2026-02-25': [{ label: 'No Classes', type: 'suspension', time: 'All Day', org: 'University Admin', description: 'Classes suspended - Local Holiday.' }],
-  '2026-02-26': [
-    { label: 'IT102 Lab', type: 'class', time: '1:00 PM - 4:00 PM', room: 'Lab 2', org: 'CICT Dept' },
-    { label: 'CICT CON', type: 'event', time: '8:00 AM', org: 'CICT CON', description: 'CICT Congress annual event.' },
-  ],
-  '2026-02-27': [{ label: 'Sports Fest', type: 'event', time: '8:00 AM - 5:00 PM', org: 'SSC', description: 'University-wide Sports Festival.' }],
-};
+const DEFAULT_EVENTS: Record<string, CalEvent[]> = {};
+
+function mergeWithPostedEvents(postedEvents: Awaited<ReturnType<typeof getPostedCalendarEvents>>): Record<string, CalEvent[]> {
+  const merged: Record<string, CalEvent[]> = { ...DEFAULT_EVENTS };
+
+  postedEvents.forEach((item) => {
+    if (!merged[item.date]) merged[item.date] = [];
+    merged[item.date].push({
+      label: item.label,
+      type: item.type,
+      time: item.time,
+      room: item.room,
+      building: item.building,
+      department: item.department,
+      org: item.org,
+      description: item.description,
+    });
+  });
+
+  return merged;
+}
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const SHORT_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -51,8 +66,28 @@ function getFirstDaySun(y: number, m: number) { return new Date(y, m, 1).getDay(
 function dateKey(y: number, m: number, d: number) {
   return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 }
+// search result
+interface SearchResult {
+  dateKey: string;
+  year: number;
+  month: number;
+  day: number;
+  eventIndex: number;
+  event: CalEvent;
+}
 
-// ─── EVENT CHIP ────────────────────────────────────────────────────
+function buildSearchIndex(eventsByDate: Record<string, CalEvent[]>): SearchResult[] {
+  const results: SearchResult[] = [];
+  for (const [key, events] of Object.entries(eventsByDate)) {
+    const [y, m, d] = key.split('-').map(Number);
+    events.forEach((ev, i) => {
+      results.push({ dateKey: key, year: y, month: m - 1, day: d, eventIndex: i, event: ev });
+    });
+  }
+  return results;
+}
+
+
 function EventChip({ label, type, onPress, isDark }: { label: string; type: EventType; onPress: () => void; isDark: boolean }) {
   const c = isDark ? EVENT_COLORS_DARK[type] : EVENT_COLORS_LIGHT[type];
   return (
@@ -69,7 +104,104 @@ const chip = StyleSheet.create({
   text: { fontSize: 9, fontWeight: '700', flexShrink: 1 },
 });
 
-// ─── EVENT DETAIL PANEL ────────────────────────────────────────────
+// search dropdown
+function SearchDropdown({ results, isDark, onSelect, onClose }: {
+  results: SearchResult[];
+  isDark: boolean;
+  onSelect: (r: SearchResult) => void;
+  onClose: () => void;
+}) {
+  const EC = isDark ? EVENT_COLORS_DARK : EVENT_COLORS_LIGHT;
+  const bg       = isDark ? '#1e2a3a' : '#ffffff';
+  const border   = isDark ? '#2d3f55' : '#e2e8f0';
+  const dateClr  = isDark ? '#64748b' : '#94a3b8';
+  const emptyClr = isDark ? '#4a5878' : '#94a3b8';
+
+  return (
+    <Modal transparent visible animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity style={sr.backdrop} activeOpacity={1} onPress={onClose} />
+
+      <View style={[sr.dropdown, { backgroundColor: bg, borderColor: border, top: 118 }]}>
+        {results.length === 0 ? (
+          <View style={sr.empty}>
+            <Text style={sr.emptyIcon}>🔍</Text>
+            <Text style={[sr.emptyText, { color: emptyClr }]}>No events found</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={results}
+            keyExtractor={(r) => `${r.dateKey}-${r.eventIndex}`}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item: r }) => {
+              const c = EC[r.event.type];
+              const dateStr = `${MONTHS[r.month]} ${r.day}, ${r.year}`;
+              return (
+                <TouchableOpacity
+                  style={[sr.item, { borderBottomColor: border }]}
+                  onPress={() => onSelect(r)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[sr.strip, { backgroundColor: c.border }]} />
+
+                  <View style={sr.itemContent}>
+                    <View style={sr.itemTop}>
+                      <View style={[sr.typeBadge, { backgroundColor: c.bg, borderColor: c.border + '88' }]}>
+                        <Text style={sr.typeIcon}>{TYPE_ICONS[r.event.type]}</Text>
+                        <Text style={[sr.typeText, { color: c.text }]}>{TYPE_LABELS[r.event.type]}</Text>
+                      </View>
+                      <Text style={[sr.dateText, { color: dateClr }]}>{dateStr}</Text>
+                    </View>
+
+                    
+                    <Text style={[sr.label, { color: isDark ? '#e2e8f0' : '#1e293b' }]} numberOfLines={1}>
+                      {r.event.label}
+                    </Text>
+
+                   
+                    <View style={sr.metaRow}>
+                      {r.event.time && <Text style={[sr.meta, { color: isDark ? '#64748b' : '#94a3b8' }]}>{ICONS.meta.time} {r.event.time}</Text>}
+                      {r.event.room && <Text style={[sr.meta, { color: isDark ? '#64748b' : '#94a3b8' }]}>{ICONS.meta.room} {r.event.room}</Text>}
+                      {r.event.building && <Text style={[sr.meta, { color: isDark ? '#64748b' : '#94a3b8' }]}>{ICONS.meta.building} {r.event.building}</Text>}
+                      {(r.event.department || r.event.org) && <Text style={[sr.meta, { color: isDark ? '#64748b' : '#94a3b8' }]}>{ICONS.meta.organization} {r.event.department || r.event.org}</Text>}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+          />
+        )}
+      </View>
+    </Modal>
+  );
+}
+const sr = StyleSheet.create({
+  backdrop: { ...StyleSheet.absoluteFillObject },
+  dropdown: {
+    position: 'absolute', left: 12, right: 12,
+    borderRadius: 14, borderWidth: 1,
+    maxHeight: 320, overflow: 'hidden',
+    elevation: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4, shadowRadius: 12,
+  },
+  empty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 32, gap: 8 },
+  emptyIcon: { fontSize: 28 },
+  emptyText: { fontSize: 13 },
+  item: { flexDirection: 'row', borderBottomWidth: 1 },
+  strip: { width: 4 },
+  itemContent: { flex: 1, paddingHorizontal: 12, paddingVertical: 10, gap: 3 },
+  itemTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  typeBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2 },
+  typeIcon: { fontSize: 9 },
+  typeText: { fontSize: 9, fontWeight: '700' },
+  dateText: { fontSize: 10 },
+  label: { fontSize: 14, fontWeight: '700' },
+  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  meta: { fontSize: 11 },
+});
+
+// event details
 function EventDetailPanel({ selectedDate, focusedIndex, events, year, month, onClearFocus, isDark }: {
   selectedDate: number | null; focusedIndex: number | null;
   events: CalEvent[]; year: number; month: number;
@@ -81,16 +213,16 @@ function EventDetailPanel({ selectedDate, focusedIndex, events, year, month, onC
   React.useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 220, useNativeDriver: true }).start();
     return () => { fadeAnim.setValue(0); };
-  }, [selectedDate, focusedIndex]);
+  }, [selectedDate, focusedIndex, fadeAnim]);
 
   const displayEvents = focusedIndex !== null ? [events[focusedIndex]] : events;
   const dateObj = selectedDate ? new Date(year, month, selectedDate) : null;
   const dayName = dateObj ? ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dateObj.getDay()] : '';
   const dominantType: EventType = events[0]?.type ?? 'event';
   const accentColor = selectedDate && events.length > 0 ? EC[dominantType].border : (isDark ? '#4a5878' : '#cbd5e0');
-  const panelBg     = isDark ? '#1a2536' : '#f8fafc';
-  const labelColor  = isDark ? '#e2e8f0' : '#1e293b';
-  const mutedColor  = isDark ? '#4a5878' : '#94a3b8';
+  const panelBg    = isDark ? '#1a2536' : '#f8fafc';
+  const labelColor = isDark ? '#e2e8f0' : '#1e293b';
+  const mutedColor = isDark ? '#4a5878' : '#94a3b8';
 
   return (
     <View style={[ep.wrapper, { backgroundColor: panelBg, borderTopColor: accentColor }]}>
@@ -153,9 +285,10 @@ function EventDetailPanel({ selectedDate, focusedIndex, events, year, month, onC
                       </View>
                       <Text style={[ep.cardTitle, { color: c.text }]} numberOfLines={1}>{ev.label}</Text>
                       <View style={ep.infoLine}>
-                        {ev.time && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>🕐 {ev.time}</Text>}
-                        {ev.room && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>📍 {ev.room}</Text>}
-                        {ev.org  && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>🏛 {ev.org}</Text>}
+                        {ev.time && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>{ICONS.meta.time} {ev.time}</Text>}
+                        {ev.room && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>{ICONS.meta.room} {ev.room}</Text>}
+                        {ev.building && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>{ICONS.meta.building} {ev.building}</Text>}
+                        {(ev.department || ev.org) && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>{ICONS.meta.organization} {ev.department || ev.org}</Text>}
                       </View>
                       {ev.description && <Text style={[ep.desc, { color: c.text + '88' }]} numberOfLines={2}>{ev.description}</Text>}
                     </View>
@@ -204,10 +337,11 @@ const ep = StyleSheet.create({
   desc: { fontSize: 10, marginTop: 5, fontStyle: 'italic', lineHeight: 14 },
 });
 
-// ─── MONTH VIEW ────────────────────────────────────────────────────
-function MonthView({ year, month, onPrev, onNext, onSelectDate, isDark }: {
+// month view
+function MonthView({ year, month, onPrev, onNext, onSelectDate, isDark, eventsByDate }: {
   year: number; month: number; onPrev: () => void; onNext: () => void;
   onSelectDate: (date: number, ei: number | null) => void; isDark: boolean;
+  eventsByDate: Record<string, CalEvent[]>;
 }) {
   const [selectedDate, setSelectedDate] = useState<number | null>(null);
   const days = getDaysInMonth(year, month);
@@ -250,7 +384,7 @@ function MonthView({ year, month, onPrev, onNext, onSelectDate, isDark }: {
           <View key={wi} style={[mv.weekRow, { borderBottomColor: gridBorder }]}>
             {week.map((cell, di) => {
               const key = cell.current ? dateKey(year, month, cell.day) : '';
-              const evs = EVENTS[key] || [];
+              const evs = eventsByDate[key] || [];
               const isToday    = cell.current && cell.day === today;
               const isSelected = cell.current && cell.day === selectedDate;
               return (
@@ -308,8 +442,7 @@ const mv = StyleSheet.create({
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { fontSize: 11 },
 });
-
-// ─── MINI CALENDAR ─────────────────────────────────────────────────
+// calendar
 function MiniCalendar({ year, month, isDark }: { year: number; month: number; isDark: boolean }) {
   const days = getDaysInMonth(year, month);
   const firstDay = getFirstDaySun(year, month);
@@ -347,21 +480,14 @@ function YearView({ year, isDark }: { year: number; isDark: boolean }) {
   );
 }
 
-// ─── WEEK VIEW ─────────────────────────────────────────────────────
-const WEEK_EVENTS_DATA = [
-  { day: 0, row: 0, rowSpan: 1, label: 'Class Schedule', color: '#86efac' },
-  { day: 6, row: 0, rowSpan: 1, label: 'Class Schedule', color: '#86efac' },
-  { day: 1, row: 1, rowSpan: 2, label: 'Class Schedule', color: '#86efac' },
-  { day: 3, row: 1, rowSpan: 1, label: 'Class Schedule', color: '#86efac' },
-  { day: 5, row: 1, rowSpan: 1, label: 'Events', color: '#93c5fd' },
-  { day: 1, row: 3, rowSpan: 1, label: 'No Classes', color: '#fca5a5' },
-  { day: 2, row: 3, rowSpan: 2, label: 'Events', color: '#93c5fd' },
-  { day: 4, row: 3, rowSpan: 1, label: 'Events', color: '#93c5fd' },
-  { day: 6, row: 3, rowSpan: 1, label: 'Class Schedule', color: '#86efac' },
-  { day: 1, row: 5, rowSpan: 2, label: 'Events', color: '#93c5fd' },
-  { day: 3, row: 5, rowSpan: 2, label: 'Class Schedule', color: '#86efac' },
-  { day: 5, row: 5, rowSpan: 1, label: 'Class Schedule', color: '#86efac' },
-];
+// week view
+const WEEK_EVENTS_DATA: {
+  day: number;
+  row: number;
+  rowSpan: number;
+  label: string;
+  color: string;
+}[] = [];
 function WeekView({ isDark }: { isDark: boolean }) {
   const COL_WIDTH = (width - 32) / 7;
   const ROW_HEIGHT = 72;
@@ -400,35 +526,6 @@ const wv = StyleSheet.create({
   eventText: { fontSize: 9, fontWeight: '700', textAlign: 'center' },
 });
 
-// ─── BOTTOM NAV ────────────────────────────────────────────────────
-function BottomNav({ active, isDark }: { active: string; isDark: boolean }) {
-  const tabs = [
-    { id: 'calendar', label: 'Calendar', icon: '📅' },
-    { id: 'events',   label: 'Events',   icon: '☰' },
-    { id: 'profile',  label: 'Profile',  icon: '👤' },
-  ];
-  return (
-    <View style={[bn.container, { backgroundColor: isDark ? '#131d2a' : '#ffffff', borderTopColor: isDark ? '#1e2a3a' : '#e2e8f0' }]}>
-      {tabs.map(t => (
-        <TouchableOpacity key={t.id} style={bn.tab} onPress={() => t.id !== active && router.push(`/student/${t.id}` as any)}>
-          <Text style={[bn.icon, active === t.id && bn.activeIcon]}>{t.icon}</Text>
-          <Text style={[bn.label, { color: isDark ? '#4a5878' : '#94a3b8' }, active === t.id && { color: isDark ? '#e2e8f0' : '#1e293b', fontWeight: '700' }]}>{t.label}</Text>
-          {active === t.id && <View style={bn.activeBar} />}
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-}
-const bn = StyleSheet.create({
-  container: { flexDirection: 'row', borderTopWidth: 1, paddingBottom: 20, paddingTop: 10 },
-  tab: { flex: 1, alignItems: 'center', gap: 2, position: 'relative' },
-  icon: { fontSize: 22, opacity: 0.4 },
-  activeIcon: { opacity: 1 },
-  label: { fontSize: 11, fontWeight: '500' },
-  activeBar: { position: 'absolute', bottom: -10, width: 20, height: 3, backgroundColor: '#3b82f6', borderRadius: 2 },
-});
-
-// ─── VIEW SWITCHER ─────────────────────────────────────────────────
 function ViewSwitcher({ current, onChange, isDark }: { current: ViewType; onChange: (v: ViewType) => void; isDark: boolean }) {
   const [visible, setVisible] = useState(false);
   const [pos, setPos] = useState({ top: 0, right: 0 });
@@ -462,27 +559,93 @@ const vs = StyleSheet.create({
   itemText: { fontSize: 14 },
   checkmark: { color: '#3b82f6', fontSize: 14, fontWeight: '700' },
 });
-
-// ─── MAIN ──────────────────────────────────────────────────────────
+// main
 export default function CalendarScreen() {
-  const { isDark } = useTheme(); // ✅ global theme — syncs with Profile toggle
+  const { isDark } = useTheme();
+  const today = new Date();
 
-  const [view, setView] = useState<ViewType>('Month');
-  const [year, setYear] = useState(2026);
-  const [month, setMonth] = useState(1);
-  const [search, setSearch] = useState('');
-  const [selectedDate, setSelectedDate] = useState<number | null>(null);
+  const [view, setView]           = useState<ViewType>('Month');
+  const [year, setYear]           = useState(today.getFullYear());
+  const [month, setMonth]         = useState(today.getMonth());
+  const [search, setSearch]       = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedDate, setSelectedDate]         = useState<number | null>(null);
   const [focusedEventIndex, setFocusedEventIndex] = useState<number | null>(null);
+  const [eventsByDate, setEventsByDate] = useState<Record<string, CalEvent[]>>(DEFAULT_EVENTS);
 
-  const screenBg       = isDark ? '#0f172a' : '#f0f4f8';
-  const headerBg       = isDark ? '#131d2a' : '#ffffff';
-  const headerBorder   = isDark ? '#1e2a3a' : '#e2e8f0';
-  const titleColor     = isDark ? '#ffffff' : '#0f172a';
-  const subtitleColor  = isDark ? '#4a5878' : '#94a3b8';
-  const searchBg       = isDark ? '#1e2a3a' : '#f1f5f9';
-  const searchBorder   = isDark ? '#2d3f55' : '#e2e8f0';
-  const searchColor    = isDark ? '#e2e8f0' : '#1e293b';
-  const searchPh       = isDark ? '#4a5878' : '#94a3b8';
+  const reloadEvents = useCallback(async () => {
+    const posted = await getPostedCalendarEvents();
+    setEventsByDate(mergeWithPostedEvents(posted));
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      (async () => {
+        const posted = await getPostedCalendarEvents();
+        if (!active) return;
+        setEventsByDate(mergeWithPostedEvents(posted));
+      })();
+
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
+  useEffect(() => {
+    const unsubscribe = subscribeScheduleChanges(() => {
+      reloadEvents();
+    });
+    return unsubscribe;
+  }, [reloadEvents]);
+
+  const searchIndex = useMemo(() => buildSearchIndex(eventsByDate), [eventsByDate]);
+
+
+  const searchResults = useMemo<SearchResult[]>(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    return searchIndex.filter(r => {
+      const ev = r.event;
+      return (
+        ev.label.toLowerCase().includes(q) ||
+        ev.type.toLowerCase().includes(q)  ||
+        TYPE_LABELS[ev.type].toLowerCase().includes(q) ||
+        (ev.room?.toLowerCase().includes(q) ?? false) ||
+        (ev.building?.toLowerCase().includes(q) ?? false) ||
+        (ev.department?.toLowerCase().includes(q) ?? false) ||
+        (ev.org?.toLowerCase().includes(q)  ?? false) ||
+        (ev.description?.toLowerCase().includes(q) ?? false)
+      );
+    });
+  }, [search, searchIndex]);
+
+  const handleSearchChange = (text: string) => {
+    setSearch(text);
+    setShowDropdown(text.trim().length > 0);
+  };
+
+  const handleSelectResult = (r: SearchResult) => {
+    setShowDropdown(false);
+    setSearch('');
+    setView('Month');
+    setYear(r.year);
+    setMonth(r.month);
+    setSelectedDate(r.day);
+    setFocusedEventIndex(r.eventIndex);
+  };
+
+  const screenBg      = isDark ? '#0f172a' : '#f0f4f8';
+  const headerBg      = isDark ? '#131d2a' : '#ffffff';
+  const headerBorder  = isDark ? '#1e2a3a' : '#e2e8f0';
+  const titleColor    = isDark ? '#ffffff' : '#0f172a';
+  const subtitleColor = isDark ? '#4a5878' : '#94a3b8';
+  const searchBg      = isDark ? '#1e2a3a' : '#f1f5f9';
+  const searchBorder  = isDark ? '#2d3f55' : '#e2e8f0';
+  const searchColor   = isDark ? '#e2e8f0' : '#1e293b';
+  const searchPh      = isDark ? '#4a5878' : '#94a3b8';
 
   const handleSelectDate = (date: number, eventIndex: number | null) => {
     setSelectedDate(date); setFocusedEventIndex(eventIndex);
@@ -496,7 +659,7 @@ export default function CalendarScreen() {
     if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1);
   };
 
-  const selectedDateEvents = selectedDate ? (EVENTS[dateKey(year, month, selectedDate)] || []) : [];
+  const selectedDateEvents = selectedDate ? (eventsByDate[dateKey(year, month, selectedDate)] || []) : [];
 
   return (
     <View style={[s.screen, { backgroundColor: screenBg }]}>
@@ -508,28 +671,54 @@ export default function CalendarScreen() {
           <Text style={[s.subtitle, { color: subtitleColor }]}>{MONTHS[month]} {year}</Text>
         </View>
         <View style={s.headerRight}>
-          <View style={[s.searchBar, { backgroundColor: searchBg, borderColor: searchBorder }]}>
+          <View style={[s.searchBar, { backgroundColor: searchBg, borderColor: showDropdown ? '#3b82f6' : searchBorder }]}>
             <Text style={s.searchIcon}>🔍</Text>
-            <TextInput style={[s.searchInput, { color: searchColor }]} value={search} onChangeText={setSearch}
-              placeholder="Search events…" placeholderTextColor={searchPh} />
+            <TextInput
+              style={[s.searchInput, { color: searchColor }]}
+              value={search}
+              onChangeText={handleSearchChange}
+              placeholder="Search events…"
+              placeholderTextColor={searchPh}
+              returnKeyType="search"
+              onFocus={() => { if (search.trim()) setShowDropdown(true); }}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => { setSearch(''); setShowDropdown(false); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={[s.clearBtn, { color: searchPh }]}>✕</Text>
+              </TouchableOpacity>
+            )}
           </View>
           <ViewSwitcher current={view} onChange={setView} isDark={isDark} />
         </View>
       </View>
 
+      {showDropdown && (
+        <SearchDropdown
+          results={searchResults}
+          isDark={isDark}
+          onSelect={handleSelectResult}
+          onClose={() => { setShowDropdown(false); setSearch(''); }}
+        />
+      )}
+
       <View style={[s.content, { backgroundColor: screenBg }]}>
-        {view === 'Month' && <MonthView year={year} month={month} onPrev={handlePrev} onNext={handleNext} onSelectDate={handleSelectDate} isDark={isDark} />}
+        {view === 'Month' && (
+          <MonthView year={year} month={month} onPrev={handlePrev} onNext={handleNext}
+            onSelectDate={handleSelectDate} isDark={isDark} eventsByDate={eventsByDate} />
+        )}
         {view === 'Year'  && <YearView year={year} isDark={isDark} />}
         {view === 'Week'  && <WeekView isDark={isDark} />}
       </View>
 
       {view === 'Month' && (
-        <EventDetailPanel selectedDate={selectedDate} focusedIndex={focusedEventIndex}
+        <EventDetailPanel
+          selectedDate={selectedDate} focusedIndex={focusedEventIndex}
           events={selectedDateEvents} year={year} month={month}
-          onClearFocus={() => setFocusedEventIndex(null)} isDark={isDark} />
+          onClearFocus={() => setFocusedEventIndex(null)} isDark={isDark}
+        />
       )}
 
-      <BottomNav active="calendar" isDark={isDark} />
+      <BottomNav role="student" active="calendar" />
     </View>
   );
 }
@@ -543,5 +732,6 @@ const s = StyleSheet.create({
   searchBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6, gap: 4, borderWidth: 1 },
   searchIcon: { fontSize: 12 },
   searchInput: { fontSize: 13, width: 90, paddingVertical: 0 },
+  clearBtn: { fontSize: 12, paddingLeft: 4 },
   content: { flex: 1, paddingHorizontal: 12, paddingTop: 4 },
 });

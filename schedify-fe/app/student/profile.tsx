@@ -1,40 +1,27 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Switch, StatusBar, Alert, ScrollView,
+  Switch, StatusBar, Alert, ScrollView, Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { useTheme } from '../../ThemeContext';
+import BottomNav from '../../components/BottomNav';
+import { getPostedCalendarEvents } from '../../utils/scheduleStore';
+import {
+  CLASS_REMINDER_OPTIONS,
+  getClassReminderOverrides,
+  getDefaultClassReminder,
+  reminderOptionLabel,
+  setDefaultClassReminder,
+  type ReminderOption,
+} from '../../utils/classReminderStore';
+import { syncClassReminderNotifications } from '../../utils/classReminderScheduler';
 
 const AvatarIcon = ({ color }: { color: string }) => (
   <Svg width="52" height="52" viewBox="0 0 48 48" fill="none">
     <Circle cx="24" cy="17" r="9" stroke={color} strokeWidth="2.5" fill="none" />
     <Path d="M6 42c0-9.9 8.1-16 18-16s18 6.1 18 16" stroke={color} strokeWidth="2.5" strokeLinecap="round" fill="none" />
-  </Svg>
-);
-const ShieldLogo = () => (
-  <Svg width="30" height="30" viewBox="0 0 42 42" fill="none">
-    <Path d="M21 2L4 9v11c0 10.5 7.3 20.3 17 23 9.7-2.7 17-12.5 17-23V9L21 2z" fill="#2d3748" stroke="#4a9d5f" strokeWidth="2" />
-    <Path d="M14 14h6v12h-6zM22 14h6v12h-6z" fill="none" stroke="#4a9d5f" strokeWidth="1.5" strokeLinejoin="round" />
-    <Path d="M20 14v12M20 17h2" stroke="#4a9d5f" strokeWidth="1.5" />
-    <Path d="M13 26c2-1 5-1 7 0s5 1 7 0" stroke="#4a9d5f" strokeWidth="1.5" strokeLinecap="round" />
-  </Svg>
-);
-const CalendarIcon = ({ color }: { color: string }) => (
-  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <Path d="M8 2v3M16 2v3M3 9h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
-  </Svg>
-);
-const EventsIcon = ({ color }: { color: string }) => (
-  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <Path d="M4 6h16M4 12h16M4 18h10" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
-  </Svg>
-);
-const ProfileIcon = ({ color }: { color: string }) => (
-  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <Circle cx="12" cy="8" r="4" stroke={color} strokeWidth="1.8" fill="none" />
-    <Path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8" stroke={color} strokeWidth="1.8" strokeLinecap="round" fill="none" />
   </Svg>
 );
 const MoonIcon = ({ color }: { color: string }) => (
@@ -83,11 +70,12 @@ const BlockIcon = ({ color }: { color: string }) => (
 
 export default function Profile() {
   const { isDark, toggleTheme, theme: t } = useTheme();
+  const [defaultReminder, setDefaultReminder] = useState<ReminderOption>('30m');
 
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Log Out', style: 'destructive', onPress: () => router.replace('/login' as any) },
+      { text: 'Log Out', style: 'destructive', onPress: () => router.replace('/student/login' as any) },
     ]);
   };
 
@@ -97,13 +85,37 @@ export default function Profile() {
     { icon: <BlockIcon color={t.accent} />, label: 'Block', value: 'Block B — 3-B' },
   ];
 
+  const reloadReminderSettings = useCallback(async () => {
+    const current = await getDefaultClassReminder();
+    setDefaultReminder(current);
+  }, []);
+
+  useEffect(() => {
+    void reloadReminderSettings();
+  }, [reloadReminderSettings]);
+
+  const handleDefaultReminderChange = async (option: ReminderOption) => {
+    await setDefaultClassReminder(option);
+    setDefaultReminder(option);
+
+    const [posted, overrides] = await Promise.all([
+      getPostedCalendarEvents(),
+      getClassReminderOverrides(),
+    ]);
+    await syncClassReminderNotifications(posted, option, overrides);
+  };
+
   return (
     <View style={[styles.screen, { backgroundColor: t.bg }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={t.bg} />
 
       <View style={[styles.topBar, { backgroundColor: t.bg }]}>
         <View style={styles.topLeft}>
-          <ShieldLogo />
+          <Image
+            source={require('../../assets/images/logo.png')}
+            style={styles.topLogo}
+            resizeMode="contain"
+          />
           <Text style={[styles.brandName, { color: t.title }]}>Schedify</Text>
         </View>
         <View style={[styles.togglePill, { backgroundColor: t.card, borderColor: t.cardBorder }]}>
@@ -117,6 +129,8 @@ export default function Profile() {
           />
         </View>
       </View>
+
+      
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={[styles.heroCard, { backgroundColor: t.card, borderColor: t.cardBorder }]}>
@@ -172,26 +186,36 @@ export default function Profile() {
             <ChevronRight color={t.muted} />
           </TouchableOpacity>
         </View>
+
+        <Text style={[styles.sectionTitle, { color: t.muted }]}>CLASS REMINDERS</Text>
+        <View style={[styles.card, { backgroundColor: t.card, borderColor: t.cardBorder }]}>
+          <View style={styles.reminderWrap}>
+            {CLASS_REMINDER_OPTIONS.map((option) => {
+              const selected = defaultReminder === option;
+              return (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.reminderChip,
+                    { backgroundColor: t.input, borderColor: t.divider },
+                    selected && { backgroundColor: t.accent + '22', borderColor: t.accent + '88' },
+                  ]}
+                  onPress={() => {
+                    void handleDefaultReminderChange(option);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.reminderChipText, { color: selected ? t.accent : t.muted }]}>
+                    {reminderOptionLabel(option)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
       </ScrollView>
 
-      <View style={[styles.bottomNav, { backgroundColor: t.navBg, borderTopColor: t.navBorder }]}>
-        {[
-          { label: 'Calendar', route: '/student/calendar', active: false, icon: (a: boolean) => <CalendarIcon color={a ? t.accent : t.muted} /> },
-          { label: 'Events', route: '/student/events', active: false, icon: (a: boolean) => <EventsIcon color={a ? t.accent : t.muted} /> },
-          { label: 'Profile', route: null, active: true, icon: (a: boolean) => <ProfileIcon color={a ? t.accent : t.muted} /> },
-        ].map(tab => (
-          <TouchableOpacity
-            key={tab.label}
-            style={styles.navItem}
-            onPress={() => tab.route && router.push(tab.route as any)}
-            activeOpacity={0.7}
-          >
-            {tab.icon(tab.active)}
-            <Text style={[styles.navLabel, { color: tab.active ? t.accent : t.muted }]}>{tab.label}</Text>
-            {tab.active && <View style={[styles.navDot, { backgroundColor: t.accent }]} />}
-          </TouchableOpacity>
-        ))}
-      </View>
+      <BottomNav role="student" active="profile" />
     </View>
   );
 }
@@ -200,6 +224,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 52, paddingBottom: 12 },
   topLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  topLogo: { width: 32, height: 32 },
   brandName: { fontSize: 24, fontWeight: '300', letterSpacing: 0.5 },
   togglePill: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
   scroll: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 20 },
@@ -221,8 +246,7 @@ const styles = StyleSheet.create({
   divider: { height: 1, marginHorizontal: 16 },
   actionRow: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 14 },
   actionLabel: { flex: 1, fontSize: 15, fontWeight: '500' },
-  bottomNav: { flexDirection: 'row', paddingVertical: 10, paddingBottom: 28, borderTopWidth: 1 },
-  navItem: { flex: 1, alignItems: 'center', gap: 3 },
-  navLabel: { fontSize: 11, fontWeight: '500' },
-  navDot: { width: 4, height: 4, borderRadius: 2, marginTop: 1 },
+  reminderWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 16 },
+  reminderChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
+  reminderChipText: { fontSize: 12, fontWeight: '600' },
 });

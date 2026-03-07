@@ -48,21 +48,18 @@ const Login = () => {
     >
       <StatusBar barStyle="light-content" backgroundColor="#2d3748" />
 
-      {/* Logo */}
       <Image
-        source={require('../assets/images/logo.png')}
+        source={require('../../assets/images/logo.png')}
         style={styles.logo}
         resizeMode="contain"
       />
 
-      {/* App Name */}
       <Text style={styles.appName}>
         <Text style={styles.appNameNormal}>Sch</Text>
         <Text style={styles.appNameNormal}>e</Text>
         <Text style={styles.appNameNormal}>dify</Text>
       </Text>
 
-      {/* Email */}
       <View style={styles.formGroup}>
         <Text style={styles.label}>Email</Text>
         <TextInput
@@ -77,7 +74,6 @@ const Login = () => {
         {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
       </View>
 
-      {/* Password */}
       <View style={styles.formGroup}>
         <Text style={styles.label}>Password</Text>
         <TextInput
@@ -91,7 +87,7 @@ const Login = () => {
         {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
       </View>
 
-      {/* Role Dropdown */}
+
       <View style={styles.formGroup}>
         <Text style={styles.label}>Role</Text>
         <View style={styles.pickerWrapper}>
@@ -101,20 +97,18 @@ const Login = () => {
             style={styles.picker}
             dropdownIconColor="#a0aec0"
           >
-            <Picker.Item label="Select role..." value="" color="#a0aec0" />
-            <Picker.Item label="Student" value="student" color="#fff" />
-            <Picker.Item label="Professor" value="professor" color="#fff" />
+            <Picker.Item label="Select role..." value="" color="#999" />
+            <Picker.Item label="Student" value="student" color="#333" />
+            <Picker.Item label="Professor" value="professor" color="#333" />
           </Picker>
         </View>
       </View>
 
-      {/* Login Button */}
       <TouchableOpacity style={styles.button} onPress={handleSubmit} activeOpacity={0.8}>
         <Text style={styles.buttonText}>Login</Text>
       </TouchableOpacity>
 
-      {/* Create account link */}
-      <TouchableOpacity onPress={() => router.push('/signup' as any)}>
+      <TouchableOpacity onPress={() => router.push('/student/signup' as any)}>
         <Text style={styles.linkText}>Create an account</Text>
       </TouchableOpacity>
 
@@ -146,7 +140,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   appNameAccent: {
-    color: '#68d391',
+    color: '#68d391',  
     fontWeight: '400',
   },
   formGroup: {
@@ -179,12 +173,12 @@ const styles = StyleSheet.create({
   pickerWrapper: {
     backgroundColor: '#5a6778',
     borderRadius: 8,
-    overflow: 'hidden',
+    paddingHorizontal: 4,
   },
   picker: {
     color: '#ffffff',
-    backgroundColor: '#5a6778',
-    height: 50,
+    backgroundColor: 'transparent',
+    height: 52,
   },
   button: {
     backgroundColor: '#4a5568',
