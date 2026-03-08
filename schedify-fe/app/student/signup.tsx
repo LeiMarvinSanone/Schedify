@@ -5,6 +5,8 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Picker } from '@react-native-picker/picker';
+import { Ionicons } from '@expo/vector-icons';
+import { signup as apiSignup } from '../../utils/apiClient';
 
 type Role = 'Student' | 'Professor';
 
@@ -27,24 +29,70 @@ const SignUp = () => {
     block: '',
   });
   const [role, setRole] = useState<Role>('Student');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const update = (field: string, value: string) =>
+  const update = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
 
   const handleSubmit = async () => {
     const { name, email, password, idNo, department, course, block } = formData;
+    const nextErrors: Record<string, string> = {};
 
-    if (!name || !email || !password || !idNo || !department || !course || !block) {
-      Alert.alert('Missing Fields', 'Please fill in all fields.');
+    if (!name.trim()) nextErrors.name = 'Name is required';
+    if (!email.trim()) nextErrors.email = 'Email is required';
+    if (!password.trim()) nextErrors.password = 'Password is required';
+    if (!idNo.trim()) nextErrors.idNo = 'ID number is required';
+    if (!department.trim()) nextErrors.department = 'Department is required';
+    if (!course.trim()) nextErrors.course = 'Course is required';
+    if (!block.trim()) nextErrors.block = 'Block is required';
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      Alert.alert('Missing Fields', 'Please complete all required fields.');
       return;
     }
 
     try {
       await new Promise(resolve => setTimeout(resolve, 300));
-      Alert.alert('Success', 'Account created! Please login.');
-      router.replace('/student/login' as any);
-    } catch {
-      Alert.alert('Error', 'Failed. Please try again.');
+      setIsLoading(true);
+      await apiSignup({
+        name: name.trim(),
+        email: email.trim(),
+        password: password.trim(),
+        idNo: idNo.trim(),
+        department: department.trim(),
+        course: course.trim(),
+        block: block.trim(),
+        role,
+      });
+      setErrors({});
+      Alert.alert('Success', 'Account created!', [
+        {
+          text: 'Continue',
+          onPress: () => router.replace('/student/profile' as any),
+        },
+      ]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Signup failed. Please try again.';
+      const lower = message.toLowerCase();
+
+      if (lower.includes('email already exists')) {
+        setErrors({ email: 'Email already exists' });
+        Alert.alert('Signup failed', 'Email already exists. Please use a different email.');
+      } else if (lower.includes('id number already exists')) {
+        setErrors({ idNo: 'ID number already exists' });
+        Alert.alert('Signup failed', 'ID number already exists. Please check your ID number.');
+      } else {
+        Alert.alert('Signup failed', message);
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -74,16 +122,17 @@ const SignUp = () => {
         
         <Text style={styles.label}>Name</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, !!errors.name && styles.inputError]}
           value={formData.name}
           onChangeText={val => update('name', val)}
           placeholder="Enter your name"
           placeholderTextColor="#8a9bb0"
         />
+        {!!errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
 
         <Text style={styles.label}>Sorsu Email</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, !!errors.email && styles.inputError]}
           value={formData.email}
           onChangeText={val => update('email', val)}
           placeholder="Enter your Sorsu email"
@@ -91,32 +140,40 @@ const SignUp = () => {
           keyboardType="email-address"
           autoCapitalize="none"
         />
+        {!!errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
 
 
         <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          value={formData.password}
-          onChangeText={val => update('password', val)}
-          placeholder="Enter your password"
-          placeholderTextColor="#8a9bb0"
-          secureTextEntry
-        />
+        <View style={[styles.passwordContainer, !!errors.password && styles.inputError]}>
+          <TextInput
+            style={styles.passwordInput}
+            value={formData.password}
+            onChangeText={val => update('password', val)}
+            placeholder="Enter your password"
+            placeholderTextColor="#8a9bb0"
+            secureTextEntry={!showPassword}
+          />
+          <TouchableOpacity onPress={() => setShowPassword(prev => !prev)} style={styles.eyeButton}>
+            <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#cbd5e0" />
+          </TouchableOpacity>
+        </View>
+        {!!errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
 
         <Text style={styles.label}>ID no.</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, !!errors.idNo && styles.inputError]}
           value={formData.idNo}
           onChangeText={val => update('idNo', val)}
           placeholder="Enter your ID number"
           placeholderTextColor="#8a9bb0"
           keyboardType="numeric"
         />
+        {!!errors.idNo && <Text style={styles.errorText}>{errors.idNo}</Text>}
 
         <View style={styles.row}>
           <View style={styles.half}>
             <Text style={styles.label}>Department</Text>
-            <View style={styles.pickerWrapper}>
+            <View style={[styles.pickerWrapper, !!errors.department && styles.inputError]}>
               <Picker
                 selectedValue={formData.department}
                 onValueChange={val => {
@@ -132,11 +189,12 @@ const SignUp = () => {
                 ))}
               </Picker>
             </View>
+            {!!errors.department && <Text style={styles.errorText}>{errors.department}</Text>}
           </View>
 
           <View style={styles.half}>
             <Text style={styles.label}>Course</Text>
-            <View style={[styles.pickerWrapper, !formData.department && styles.pickerDisabled]}>
+            <View style={[styles.pickerWrapper, !formData.department && styles.pickerDisabled, !!errors.course && styles.inputError]}>
               <Picker
                 selectedValue={formData.course}
                 onValueChange={val => update('course', val)}
@@ -150,11 +208,12 @@ const SignUp = () => {
                 ))}
               </Picker>
             </View>
+            {!!errors.course && <Text style={styles.errorText}>{errors.course}</Text>}
           </View>
         </View>
 
         <Text style={styles.label}>Block</Text>
-        <View style={[styles.pickerWrapper, styles.blockPickerWidth]}>
+        <View style={[styles.pickerWrapper, styles.blockPickerWidth, !!errors.block && styles.inputError]}>
           <Picker
             selectedValue={formData.block}
             onValueChange={val => update('block', val)}
@@ -167,6 +226,7 @@ const SignUp = () => {
             ))}
           </Picker>
         </View>
+        {!!errors.block && <Text style={styles.errorText}>{errors.block}</Text>}
 
         <View style={styles.roleRow}>
           <View style={styles.roleTag}>
@@ -187,8 +247,8 @@ const SignUp = () => {
           ))}
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={handleSubmit} activeOpacity={0.85}>
-          <Text style={styles.buttonText}>Sign up</Text>
+        <TouchableOpacity style={styles.button} onPress={handleSubmit} activeOpacity={0.85} disabled={isLoading}>
+          <Text style={styles.buttonText}>{isLoading ? 'Creating account...' : 'Sign up'}</Text>
         </TouchableOpacity>
 
         <View style={styles.loginRow}>
@@ -249,6 +309,35 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     fontSize: 14,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  passwordContainer: {
+    backgroundColor: '#5a6778',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  passwordInput: {
+    flex: 1,
+    color: '#ffffff',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    fontSize: 14,
+  },
+  eyeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  inputError: {
+    borderColor: '#fc8181',
+  },
+  errorText: {
+    color: '#fc8181',
+    fontSize: 12,
+    marginTop: 4,
   },
   row: {
     flexDirection: 'row',

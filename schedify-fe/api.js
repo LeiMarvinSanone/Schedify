@@ -6,7 +6,7 @@ import axios from 'axios';
 
 // Create an axios instance with the backend base URL
 const api = axios.create({
-  baseURL: 'http://localhost:5000', // Your backend server address
+  baseURL: 'https://schedify-be.onrender.com', // Your backend server address
 });
 
 export default api; // Export so other files can use it

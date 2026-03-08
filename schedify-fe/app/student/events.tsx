@@ -8,7 +8,7 @@ import { useTheme } from '../../ThemeContext';
 import { ICONS } from '../../constants/icons';
 import BottomNav from '../../components/BottomNav';
 import { useFocusEffect } from '@react-navigation/native';
-import { getPostedCalendarEvents, subscribeScheduleChanges } from '../../utils/scheduleStore';
+import { getSchedules } from '../../utils/apiClient';
 import {
   getClassReminderOverrides,
   getDefaultClassReminder,
@@ -17,7 +17,6 @@ import {
   type ReminderOption,
   type ReminderSelection,
 } from '../../utils/classReminderStore';
-import { syncClassReminderNotifications } from '../../utils/classReminderScheduler';
 
 if (Platform.OS === 'android') {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
@@ -65,6 +64,34 @@ const DEFAULT_DATA: Record<EventType, SectionData> = {
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+function normalizeToIsoDate(value: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+
+  const day = value.trim().toLowerCase();
+  const dayMap: Record<string, number> = {
+    sunday: 0,
+    monday: 1,
+    tuesday: 2,
+    wednesday: 3,
+    thursday: 4,
+    friday: 5,
+    saturday: 6,
+  };
+
+  const target = dayMap[day];
+  if (target === undefined) return value;
+
+  const today = new Date();
+  const current = today.getDay();
+  const diff = (target - current + 7) % 7;
+  const next = new Date(today);
+  next.setDate(today.getDate() + diff);
+  const y = next.getFullYear();
+  const m = String(next.getMonth() + 1).padStart(2, '0');
+  const d = String(next.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 function formatShortDate(dateString: string | undefined): string | undefined {
   if (!dateString) return undefined;
   const [yearStr, monthStr, dayStr] = dateString.split('-');
@@ -75,24 +102,31 @@ function formatShortDate(dateString: string | undefined): string | undefined {
   return `${MONTH_NAMES[month - 1]} ${day}`;
 }
 
-function buildEventsData(postedItems: Awaited<ReturnType<typeof getPostedCalendarEvents>>): Record<EventType, SectionData> {
+function buildEventsData(schedules: Awaited<ReturnType<typeof getSchedules>>): Record<EventType, SectionData> {
   const merged: Record<EventType, SectionData> = {
     event: { ...DEFAULT_DATA.event, items: [...DEFAULT_DATA.event.items] },
     class: { ...DEFAULT_DATA.class, items: [...DEFAULT_DATA.class.items] },
     suspension: { ...DEFAULT_DATA.suspension, items: [...DEFAULT_DATA.suspension.items] },
   };
 
-  postedItems.forEach((item) => {
-    merged[item.type].items.unshift({
-      id: item.id,
-      title: item.label,
-      time: item.time,
-      room: item.room,
-      building: item.building,
-      department: item.department,
-      org: item.org,
-      description: item.description,
-      date: formatShortDate(item.date),
+  schedules.forEach((schedule) => {
+    if (!schedule.subjects || schedule.subjects.length === 0) return;
+
+    const eventType: EventType = 
+      schedule.type === 'Class Schedules' ? 'class' :
+      schedule.type === 'Events' ? 'event' : 'suspension';
+
+    schedule.subjects.forEach((subject) => {
+      const normalizedDate = normalizeToIsoDate(subject.day);
+      merged[eventType].items.unshift({
+        id: schedule._id + '-' + subject.name,
+        title: subject.name,
+        time: subject.timeRange,
+        room: subject.room,
+        department: schedule.department,
+        description: schedule.tag || schedule.course,
+        date: formatShortDate(normalizedDate),
+      });
     });
   });
 
@@ -261,16 +295,20 @@ export default function EventsScreen() {
   const [reminderOverrides, setReminderOverrides] = useState<Record<string, ReminderOption>>({});
 
   const reloadEvents = useCallback(async () => {
-    const [posted, currentDefault, currentOverrides] = await Promise.all([
-      getPostedCalendarEvents(),
-      getDefaultClassReminder(),
-      getClassReminderOverrides(),
-    ]);
+    try {
+      const [schedules, currentDefault, currentOverrides] = await Promise.all([
+        getSchedules(),
+        getDefaultClassReminder(),
+        getClassReminderOverrides(),
+      ]);
 
-    setData(buildEventsData(posted));
-    setDefaultReminder(currentDefault);
-    setReminderOverrides(currentOverrides);
-    await syncClassReminderNotifications(posted, currentDefault, currentOverrides);
+      setData(buildEventsData(schedules));
+      setDefaultReminder(currentDefault);
+      setReminderOverrides(currentOverrides);
+      // Note: syncClassReminderNotifications needs backend schedules format
+    } catch (error) {
+      console.error('Failed to load events:', error);
+    }
   }, []);
 
   useFocusEffect(
@@ -278,9 +316,13 @@ export default function EventsScreen() {
       let active = true;
 
       (async () => {
-        const posted = await getPostedCalendarEvents();
-        if (!active) return;
-        setData(buildEventsData(posted));
+        try {
+          const schedules = await getSchedules();
+          if (!active) return;
+          setData(buildEventsData(schedules));
+        } catch (error) {
+          console.error('Failed to load events:', error);
+        }
       })();
 
       return () => {
@@ -290,25 +332,18 @@ export default function EventsScreen() {
   );
 
   useEffect(() => {
-    const unsubscribe = subscribeScheduleChanges(() => {
-      void reloadEvents();
-    });
-    return unsubscribe;
+    void reloadEvents();
   }, [reloadEvents]);
 
   const handleClassReminderChange = useCallback(
     async (eventId: string, value: ReminderSelection) => {
       await setClassReminderSelection(eventId, value);
 
-      const [posted, currentOverrides] = await Promise.all([
-        getPostedCalendarEvents(),
-        getClassReminderOverrides(),
-      ]);
-
+      const currentOverrides = await getClassReminderOverrides();
       setReminderOverrides(currentOverrides);
-      await syncClassReminderNotifications(posted, defaultReminder, currentOverrides);
+      // Note: syncClassReminderNotifications would need backend format
     },
-    [defaultReminder]
+    []
   );
 
   const screenBg    = isDark ? '#0f172a' : '#f0f4f8';

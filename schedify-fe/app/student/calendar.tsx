@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useMemo, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, StatusBar, TextInput,
@@ -8,7 +8,7 @@ import { useTheme } from '../../ThemeContext';
 import { ICONS } from '../../constants/icons';
 import BottomNav from '../../components/BottomNav';
 import { useFocusEffect } from '@react-navigation/native';
-import { getPostedCalendarEvents, subscribeScheduleChanges } from '../../utils/scheduleStore';
+import { getSchedules } from '../../utils/apiClient';
 
 const { width } = Dimensions.get('window');
 
@@ -31,29 +31,126 @@ type ViewType  = 'Month' | 'Year' | 'Week';
 
 interface CalEvent {
   label: string; type: EventType;
-  time?: string; room?: string; building?: string; department?: string; org?: string; description?: string;
+  time?: string; room?: string; building?: string; department?: string; org?: string; tag?: string; description?: string;
 }
 
 const DEFAULT_EVENTS: Record<string, CalEvent[]> = {};
 
-function mergeWithPostedEvents(postedEvents: Awaited<ReturnType<typeof getPostedCalendarEvents>>): Record<string, CalEvent[]> {
-  const merged: Record<string, CalEvent[]> = { ...DEFAULT_EVENTS };
+function toIsoDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
 
-  postedEvents.forEach((item) => {
-    if (!merged[item.date]) merged[item.date] = [];
-    merged[item.date].push({
-      label: item.label,
-      type: item.type,
-      time: item.time,
-      room: item.room,
-      building: item.building,
-      department: item.department,
-      org: item.org,
-      description: item.description,
+function getDayIndex(value: string): number | undefined {
+  const day = value.trim().toLowerCase();
+  const short = day.slice(0, 3);
+  const dayMap: Record<string, number> = {
+    sunday: 0,
+    sun: 0,
+    monday: 1,
+    mon: 1,
+    tuesday: 2,
+    tue: 2,
+    wednesday: 3,
+    wed: 3,
+    thursday: 4,
+    thu: 4,
+    friday: 5,
+    fri: 5,
+    saturday: 6,
+    sat: 6,
+  };
+
+  return dayMap[day] ?? dayMap[short];
+}
+
+function parseIsoLikeDate(value: string): string | undefined {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  if (/^\d{4}-\d{2}-\d{2}T/.test(value)) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return toIsoDate(parsed);
+  }
+  return undefined;
+}
+
+function normalizeToDateKey(value: string): string {
+  const isoDate = parseIsoLikeDate(value);
+  if (isoDate) return isoDate;
+
+  const target = getDayIndex(value);
+  if (target === undefined) return '';
+
+  const today = new Date();
+  const current = today.getDay();
+  const diff = (target - current + 7) % 7;
+  const next = new Date(today);
+  next.setDate(today.getDate() + diff);
+  return toIsoDate(next);
+}
+
+function recurringDateKeysForDay(value: string, weeksAhead = 16): string[] {
+  const isoDate = parseIsoLikeDate(value);
+  if (isoDate) return [isoDate];
+
+  const target = getDayIndex(value);
+  if (target === undefined) {
+    return [];
+  }
+
+  const today = new Date();
+  const current = today.getDay();
+  const diff = (target - current + 7) % 7;
+  const first = new Date(today);
+  first.setDate(today.getDate() + diff);
+
+  const keys: string[] = [];
+  for (let i = 0; i < weeksAhead; i += 1) {
+    const next = new Date(first);
+    next.setDate(first.getDate() + i * 7);
+    keys.push(toIsoDate(next));
+  }
+  return keys;
+}
+
+function transformBackendSchedules(schedules: Awaited<ReturnType<typeof getSchedules>>): Record<string, CalEvent[]> {
+  const events: Record<string, CalEvent[]> = {};  
+
+  schedules.forEach((schedule) => {
+    if (!schedule.subjects || schedule.subjects.length === 0) return;
+
+    const eventType: EventType = 
+      schedule.type === 'Class Schedules' ? 'class' :
+      schedule.type === 'Events' ? 'event' : 'suspension';
+
+    schedule.subjects.forEach((subject) => {
+      const dateKeys = schedule.type === 'Class Schedules'
+        ? recurringDateKeysForDay(subject.day)
+        : [normalizeToDateKey(subject.day)].filter(Boolean);
+
+      // Fallback: if day is malformed, still show the item on schedule creation date.
+      const effectiveDateKeys = dateKeys.length > 0
+        ? dateKeys
+        : [toIsoDate(new Date(schedule.createdAt))];
+
+      effectiveDateKeys.forEach((dateStr) => {
+        if (!events[dateStr]) events[dateStr] = [];
+
+        events[dateStr].push({
+          label: subject.name,
+          type: eventType,
+          time: subject.timeRange,
+          room: subject.room,
+          department: schedule.department,
+          tag: schedule.tag,
+          description: schedule.course,
+        });
+      });
     });
   });
 
-  return merged;
+  return events;
 }
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -164,6 +261,7 @@ function SearchDropdown({ results, isDark, onSelect, onClose }: {
                       {r.event.room && <Text style={[sr.meta, { color: isDark ? '#64748b' : '#94a3b8' }]}>{ICONS.meta.room} {r.event.room}</Text>}
                       {r.event.building && <Text style={[sr.meta, { color: isDark ? '#64748b' : '#94a3b8' }]}>{ICONS.meta.building} {r.event.building}</Text>}
                       {(r.event.department || r.event.org) && <Text style={[sr.meta, { color: isDark ? '#64748b' : '#94a3b8' }]}>{ICONS.meta.organization} {r.event.department || r.event.org}</Text>}
+                      {r.event.tag && <Text style={[sr.meta, { color: isDark ? '#64748b' : '#94a3b8' }]}>🏷 {r.event.tag}</Text>}
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -289,6 +387,7 @@ function EventDetailPanel({ selectedDate, focusedIndex, events, year, month, onC
                         {ev.room && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>{ICONS.meta.room} {ev.room}</Text>}
                         {ev.building && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>{ICONS.meta.building} {ev.building}</Text>}
                         {(ev.department || ev.org) && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>{ICONS.meta.organization} {ev.department || ev.org}</Text>}
+                        {ev.tag && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>🏷 {ev.tag}</Text>}
                       </View>
                       {ev.description && <Text style={[ep.desc, { color: c.text + '88' }]} numberOfLines={2}>{ev.description}</Text>}
                     </View>
@@ -573,19 +672,18 @@ export default function CalendarScreen() {
   const [focusedEventIndex, setFocusedEventIndex] = useState<number | null>(null);
   const [eventsByDate, setEventsByDate] = useState<Record<string, CalEvent[]>>(DEFAULT_EVENTS);
 
-  const reloadEvents = useCallback(async () => {
-    const posted = await getPostedCalendarEvents();
-    setEventsByDate(mergeWithPostedEvents(posted));
-  }, []);
-
   useFocusEffect(
     useCallback(() => {
       let active = true;
 
       (async () => {
-        const posted = await getPostedCalendarEvents();
-        if (!active) return;
-        setEventsByDate(mergeWithPostedEvents(posted));
+        try {
+          const schedules = await getSchedules();
+          if (!active) return;
+          setEventsByDate(transformBackendSchedules(schedules));
+        } catch (error) {
+          console.error('Failed to load schedules:', error);
+        }
       })();
 
       return () => {
@@ -593,13 +691,6 @@ export default function CalendarScreen() {
       };
     }, [])
   );
-
-  useEffect(() => {
-    const unsubscribe = subscribeScheduleChanges(() => {
-      reloadEvents();
-    });
-    return unsubscribe;
-  }, [reloadEvents]);
 
   const searchIndex = useMemo(() => buildSearchIndex(eventsByDate), [eventsByDate]);
 
@@ -617,6 +708,7 @@ export default function CalendarScreen() {
         (ev.building?.toLowerCase().includes(q) ?? false) ||
         (ev.department?.toLowerCase().includes(q) ?? false) ||
         (ev.org?.toLowerCase().includes(q)  ?? false) ||
+        (ev.tag?.toLowerCase().includes(q) ?? false) ||
         (ev.description?.toLowerCase().includes(q) ?? false)
       );
     });
