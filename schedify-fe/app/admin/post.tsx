@@ -136,7 +136,7 @@ function ClassScheduleForm() {
     { id: String(Date.now()), name: '', day: 'Monday', time: '', room: '', building: '', professor: '' },
   ]);
 
-  const audienceTag = `${course} ${block}`.trim();
+  const audienceTag = [course, year, block].filter(Boolean).join(' ');
 
   const updateSubject = (id: string, field: keyof Subject, value: string) => {
     setSubjects(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
@@ -154,9 +154,9 @@ function ClassScheduleForm() {
     setPostStatus('Posting class schedule...');
 
     try {
-      if (!dept || !course || !block) {
-        Alert.alert('Missing target fields', 'Please select department, course, and block before posting.');
-        setPostStatus('Please complete department, course, and block.');
+      if (!dept || !course) {
+        Alert.alert('Missing target fields', 'Please select at least department and course before posting.');
+        setPostStatus('Please complete department and course.');
         return;
       }
 
@@ -249,6 +249,7 @@ function ClassScheduleForm() {
           <Dropdown value={block} options={BLOCKS} placeholder="Select block" onSelect={setBlock} />
         </View>
       </View>
+      <Text style={[styles.targetingHint, { color: theme.muted }]}>Leave Year Level and Block empty to target all year levels and sections in the selected course.</Text>
 
       <Text style={[styles.label, { color: theme.muted }]}>SEMESTER</Text>
       <Dropdown value={semester} options={SEMESTERS} placeholder="Select semester" onSelect={setSemester} />
@@ -573,6 +574,7 @@ const styles = StyleSheet.create({
 
   row2: { flexDirection: 'row', gap: 12 },
   col: { flex: 1 },
+  targetingHint: { marginTop: 6, fontSize: 11, lineHeight: 16 },
 
   input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14 },
   multiline: { height: 80, paddingTop: 11 },

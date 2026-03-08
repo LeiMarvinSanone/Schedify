@@ -29,6 +29,7 @@ interface UserProfile {
   idNo: string;
   department: string;
   course: string;
+  yearLevel: string;
   block: string;
   role: string;
 }
@@ -82,6 +83,12 @@ const BlockIcon = ({ color }: { color: string }) => (
     <Path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
   </Svg>
 );
+const YearLevelIcon = ({ color }: { color: string }) => (
+  <Svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <Rect x="3" y="4" width="18" height="18" rx="2" stroke={color} strokeWidth="1.8" />
+    <Path d="M16 2v4M8 2v4M3 10h18" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+  </Svg>
+);
 
 export default function Profile() {
   const { isDark, toggleTheme, theme: t } = useTheme();
@@ -103,6 +110,7 @@ export default function Profile() {
   const infoItems = [
     { icon: <DepartmentIcon color={t.accent} />, label: 'Department', value: account?.department || 'N/A' },
     { icon: <CourseIcon color={t.accent} />, label: 'Course', value: account?.course || 'N/A' },
+    { icon: <YearLevelIcon color={t.accent} />, label: 'Year Level', value: account?.yearLevel || 'N/A' },
     { icon: <BlockIcon color={t.accent} />, label: 'Block', value: account?.block || 'N/A' },
     { icon: <BlockIcon color={t.accent} />, label: 'ID No.', value: account?.idNo || 'N/A' },
   ];
