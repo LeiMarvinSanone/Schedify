@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Status
 import { ICONS } from '../../constants/icons';
 import { useTheme } from '../../ThemeContext';
 import BottomNav from '../../components/BottomNav';
-import { addPostedCalendarEvent } from '../../utils/scheduleStore';
+import { createSchedule } from '../../utils/apiClient';
 
 type PostType = 'class' | 'event' | 'suspension';
 
@@ -136,7 +136,7 @@ function ClassScheduleForm() {
     { id: String(Date.now()), name: '', day: 'Monday', time: '', room: '', building: '', professor: '' },
   ]);
 
-  const audienceTag = `${course} ${block}`;
+  const audienceTag = `${course} ${block}`.trim();
 
   const updateSubject = (id: string, field: keyof Subject, value: string) => {
     setSubjects(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
@@ -148,46 +148,24 @@ function ClassScheduleForm() {
     setSubjects(prev => prev.filter(s => s.id !== id));
   };
 
-  const dayLabelToIndex = (value: string): number | null => {
-    const day = value.trim().toLowerCase();
-    if (day.startsWith('mon')) return 1;
-    if (day.startsWith('tue')) return 2;
-    if (day.startsWith('wed')) return 3;
-    if (day.startsWith('thu')) return 4;
-    if (day.startsWith('fri')) return 5;
-    return null;
-  };
-
-  const toIsoDate = (date: Date): string => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  };
-
-  const nextDateForDay = (targetDay: number): string => {
-    const today = new Date();
-    const current = today.getDay();
-    const diff = (targetDay - current + 7) % 7;
-    const next = new Date(today);
-    next.setDate(today.getDate() + diff);
-    return toIsoDate(next);
-  };
-
   const handlePostClassSchedule = async () => {
     if (isPosting) return;
     setIsPosting(true);
     setPostStatus('Posting class schedule...');
 
     try {
+      if (!dept || !course || !block) {
+        Alert.alert('Missing target fields', 'Please select department, course, and block before posting.');
+        setPostStatus('Please complete department, course, and block.');
+        return;
+      }
+
       const validSubjects = subjects
         .map((s) => ({
-          ...s,
           name: s.name.trim(),
-          time: s.time.trim(),
-          room: s.room.trim(),
-          building: s.building.trim(),
-          professor: s.professor.trim(),
+          day: s.day,
+          timeRange: s.time.trim(),
+          room: s.room.trim() || undefined,
         }))
         .filter((s) => s.name);
 
@@ -197,27 +175,30 @@ function ClassScheduleForm() {
         return;
       }
 
-      for (const subject of validSubjects) {
-        const targetDay = dayLabelToIndex(subject.day);
-        if (targetDay === null) continue;
-
-        await addPostedCalendarEvent({
-          date: nextDateForDay(targetDay),
-          label: `${subject.name} (${course} ${block})`,
-          type: 'class',
-          time: subject.time || undefined,
-          room: subject.room || undefined,
-          building: subject.building || undefined,
-          department: dept,
-          org: subject.professor || undefined,
-          description: `${year} • ${semester}`,
-        });
-      }
+      await createSchedule({
+        type: 'Class Schedules',
+        department: dept,
+        course: course,
+        yearLevel: year,
+        block: block,
+        semester: semester,
+        tag: audienceTag || 'whole-university',
+        subjects: validSubjects,
+      });
 
       Alert.alert('Posted', `Class schedule posted with ${validSubjects.length} subject${validSubjects.length > 1 ? 's' : ''}.`);
       setPostStatus(`Posted ${validSubjects.length} subject${validSubjects.length > 1 ? 's' : ''}.`);
-    } catch (error) {
-      Alert.alert('Post failed', 'Could not save class schedule. Please try again.');
+      
+      // Reset form
+      setSubjects([{ id: '1', name: '', day: 'Monday', time: '', room: '', building: '', professor: '' }]);
+      setDept('');
+      setCourse('');
+      setYear('');
+      setBlock('');
+      setSemester('');
+      
+    } catch (error: any) {
+      Alert.alert('Post failed', error.message || 'Could not save class schedule. Please try again.');
       console.error('Failed to post class schedule:', error);
       setPostStatus('Post failed. Check console and try again.');
     } finally {
@@ -378,7 +359,7 @@ function EventSuspensionForm({ type }: { type: 'event' | 'suspension' }) {
   const formBg      = isDark ? '#14142a' : '#f8faff';
   const formBorder  = isDark ? accentColor + '33' : accentColor + '44';
 
-  const tagOptions = ['All Students', 'BSIT', 'BSCS', 'BSIS', 'BTVTED', 'BSA', 'BSAIS', 'BSE', 'BPA', 'CICT Dept', 'CBME Dept'];
+  const tagOptions = ['whole-university', 'BSIT', 'BSCS', 'BSIS', 'BTVTED', 'BSA', 'BSAIS', 'BSE', 'BPA', 'CICT Dept', 'CBME Dept'];
 
   const handlePost = async () => {
     const safeTitle = title.trim();
@@ -399,27 +380,33 @@ function EventSuspensionForm({ type }: { type: 'event' | 'suspension' }) {
       ? [startTime.trim(), endTime.trim()].filter(Boolean).join(' - ')
       : startTime.trim();
 
-    await addPostedCalendarEvent({
-      date: safeDate,
-      label: safeTitle,
-      type,
-      time: composedTime || undefined,
-      room: room.trim() || undefined,
-      building: building.trim() || undefined,
-      department: safeTag || undefined,
-      org: safeTag || undefined,
-      description: description.trim() || undefined,
-    });
+    try {
+      await createSchedule({
+        type: type === 'event' ? 'Events' : 'Suspension',
+        tag: safeTag || 'whole-university',
+        subjects: [{
+          name: safeTitle,
+          day: safeDate,
+          timeRange: composedTime || 'TBA',
+          room: room.trim() || undefined,
+        }],
+      });
 
-    Alert.alert('Posted', `${type === 'event' ? 'Event' : 'Suspension'} added to calendar.`);
-    setTitle('');
-    setDesc('');
-    setRoom('');
-    setBuilding('');
-    setDate('');
-    setStartTime('');
-    setEndTime('');
-    setTag('');
+      Alert.alert('Posted', `${type === 'event' ? 'Event' : 'Suspension'} added to calendar.`);
+      
+      // Reset form
+      setTitle('');
+      setDesc('');
+      setRoom('');
+      setBuilding('');
+      setDate('');
+      setStartTime('');
+      setEndTime('');
+      setTag('');
+    } catch (error: any) {
+      Alert.alert('Post failed', error.message || 'Could not post. Please try again.');
+      console.error('Failed to post:', error);
+    }
   };
 
   return (

@@ -5,6 +5,8 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
+import { changePassword as apiChangePassword } from '../../utils/apiClient';
 
 
 
@@ -20,12 +22,18 @@ export default function ChangePassword() {
     newPassword: '',
     confirmPassword: '',
   });
+  const [showPassword, setShowPassword] = useState({
+    currentPassword: false,
+    newPassword: false,
+    confirmPassword: false,
+  });
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     const { currentPassword, newPassword, confirmPassword } = formData;
 
     if (!currentPassword || !newPassword || !confirmPassword) {
@@ -41,9 +49,17 @@ export default function ChangePassword() {
       return;
     }
 
-    Alert.alert('Success', 'Password updated successfully!', [
-      { text: 'OK', onPress: () => router.back() },
-    ]);
+    setIsLoading(true);
+    try {
+      await apiChangePassword(currentPassword, newPassword);
+      Alert.alert('Success', 'Password updated successfully!', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to update password. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const fields = [
@@ -75,22 +91,40 @@ export default function ChangePassword() {
           {fields.map(field => (
             <View key={field.key} style={styles.inputGroup}>
               <Text style={styles.label}>{field.label}</Text>
-              <TextInput
-                style={styles.input}
-                value={formData[field.key as keyof typeof formData]}
-                onChangeText={val => handleChange(field.key, val)}
-                placeholder={field.placeholder}
-                placeholderTextColor="#8a9bb0"
-                secureTextEntry
-                autoCapitalize="none"
-              />
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  value={formData[field.key as keyof typeof formData]}
+                  onChangeText={val => handleChange(field.key, val)}
+                  placeholder={field.placeholder}
+                  placeholderTextColor="#8a9bb0"
+                  secureTextEntry={!showPassword[field.key as keyof typeof showPassword]}
+                  autoCapitalize="none"
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(prev => ({ ...prev, [field.key]: !prev[field.key as keyof typeof prev] }))}
+                  style={styles.eyeButton}
+                >
+                  <Ionicons
+                    name={showPassword[field.key as keyof typeof showPassword] ? 'eye-off' : 'eye'}
+                    size={20}
+                    color="#cbd5e0"
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
           ))}
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={handleUpdate} activeOpacity={0.85}>
-          <Text style={styles.buttonTextBold}>Update </Text>
-          <Text style={styles.buttonTextBold}>Password</Text>
+        <TouchableOpacity 
+          style={[styles.button, isLoading && styles.buttonDisabled]} 
+          onPress={handleUpdate} 
+          activeOpacity={0.85}
+          disabled={isLoading}
+        >
+          <Text style={styles.buttonTextBold}>
+            {isLoading ? 'Updating...' : 'Update Password'}
+          </Text>
         </TouchableOpacity>
 
       </ScrollView>
@@ -154,6 +188,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     width: '100%',
   },
+  passwordContainer: {
+    backgroundColor: '#4a5f78',
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  passwordInput: {
+    flex: 1,
+    color: '#ffffff',
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    fontSize: 15,
+  },
+  eyeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
   button: {
     backgroundColor: '#4a5568',
     paddingVertical: 14,
@@ -162,6 +213,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 32,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   buttonTextBold: {
     color: '#ffffff',

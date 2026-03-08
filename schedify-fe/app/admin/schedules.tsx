@@ -2,13 +2,13 @@ import React, { useState, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, StatusBar, Animated, LayoutAnimation,
-  Platform, UIManager, Alert,
+  Platform, UIManager, Alert, Modal, TextInput,
 } from 'react-native';
 import { ICONS } from '../../constants/icons';
 import { useTheme } from '../../ThemeContext';
 import BottomNav from '../../components/BottomNav';
 import { useFocusEffect } from '@react-navigation/native';
-import { getPostedCalendarEvents, deletePostedCalendarEvent } from '../../utils/scheduleStore';
+import { getSchedules, deleteSchedule, updateSchedule } from '../../utils/apiClient';
 
 if (Platform.OS === 'android') {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
@@ -16,8 +16,80 @@ if (Platform.OS === 'android') {
 
 type PostType = 'class' | 'event' | 'suspension';
 
+const DEPARTMENTS = ['CICT', 'CBME'];
+const COURSES: Record<string, string[]> = {
+  CICT: ['BSIT', 'BSCS', 'BSIS', 'BTVTED'],
+  CBME: ['BSA', 'BSAIS', 'BSE', 'BPA'],
+};
+const BLOCKS = ['Block A', 'Block B', 'Block C', 'Block D'];
+
+function Dropdown({ value, options, onSelect, placeholder }: {
+  value: string;
+  options: string[];
+  onSelect: (v: string) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const { theme } = useTheme();
+
+  return (
+    <>
+      <TouchableOpacity
+        style={[dd.trigger, { backgroundColor: theme.input, borderColor: theme.divider }]}
+        onPress={() => setOpen(true)}
+        activeOpacity={0.8}
+      >
+        <Text style={[dd.triggerText, { color: theme.text }, !value && { color: theme.muted }]}>
+          {value || placeholder || 'Select...'}
+        </Text>
+        <Text style={[dd.arrow, { color: theme.muted }]}>▾</Text>
+      </TouchableOpacity>
+
+      <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
+        <TouchableOpacity style={dd.backdrop} activeOpacity={1} onPress={() => setOpen(false)} />
+        <View style={[dd.menu, { backgroundColor: theme.card, borderColor: theme.divider }]}>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {options.map(opt => (
+              <TouchableOpacity
+                key={opt}
+                style={[dd.item, { borderBottomColor: theme.divider }, opt === value && { backgroundColor: theme.input }]}
+                onPress={() => { onSelect(opt); setOpen(false); }}
+              >
+                <Text style={[dd.itemText, { color: theme.subtitle }, opt === value && { color: theme.text, fontWeight: '700' }]}>
+                  {opt}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
+const dd = StyleSheet.create({
+  trigger: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11,
+  },
+  triggerText: { fontSize: 14, flex: 1 },
+  arrow: { fontSize: 12, marginLeft: 6 },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
+  menu: {
+    position: 'absolute', top: '30%', left: 32, right: 32,
+    borderRadius: 12, borderWidth: 1, maxHeight: 280, elevation: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5, shadowRadius: 8,
+  },
+  item: { paddingVertical: 13, paddingHorizontal: 18, borderBottomWidth: 1 },
+  itemText: { fontSize: 14 },
+});
+
 interface ScheduleItem {
   id: string;
+  scheduleId: string;
+  subjectIndex: number;
+  scheduleType: 'Class Schedules' | 'Events' | 'Suspension';
   title: string;
   tag: string;
   date?: string;
@@ -49,7 +121,7 @@ const DATA: Record<PostType, { label: string; color: string; textColor: string; 
 };
 
 
-function AccordionSection({ type, items, onDelete }: { type: PostType; items: ScheduleItem[]; onDelete?: (id: string) => void }) {
+function AccordionSection({ type, items, onDelete, onEdit }: { type: PostType; items: ScheduleItem[]; onDelete?: (id: string) => void; onEdit?: (item: ScheduleItem) => void }) {
   const { theme } = useTheme();
   const [open, setOpen] = useState(false);
   const rotateAnim = useRef(new Animated.Value(0)).current;
@@ -147,17 +219,28 @@ function AccordionSection({ type, items, onDelete }: { type: PostType; items: Sc
                   )}
                 </View>
 
-                <TouchableOpacity
-                  activeOpacity={0.5}
-                  onPress={() => {
-                    console.log('DELETE BUTTON PRESSED for:', item.id, item.title);
-                    console.log('Confirming delete for:', item.id);
-                    confirmDelete(item.title, item.id);
-                  }}
-                  style={[acc.deleteBtn, { backgroundColor: theme.danger + '20' }]}
-                >
-                  <Text style={[acc.deleteBtnText, { color: theme.danger }]}>{ICONS.actions.delete}</Text>
-                </TouchableOpacity>
+                <View style={acc.actions}>
+                  {onEdit && (
+                    <TouchableOpacity
+                      activeOpacity={0.5}
+                      onPress={() => onEdit(item)}
+                      style={[acc.editBtn, { backgroundColor: theme.accent + '20' }]}
+                    >
+                      <Text style={[acc.editBtnText, { color: theme.accent }]}>✎</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    activeOpacity={0.5}
+                    onPress={() => {
+                      console.log('DELETE BUTTON PRESSED for:', item.id, item.title);
+                      console.log('Confirming delete for:', item.id);
+                      confirmDelete(item.title, item.id);
+                    }}
+                    style={[acc.deleteBtn, { backgroundColor: theme.danger + '20' }]}
+                  >
+                    <Text style={[acc.deleteBtnText, { color: theme.danger }]}>{ICONS.actions.delete}</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ))
           )}
@@ -205,6 +288,9 @@ const acc = StyleSheet.create({
   tagBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start', marginBottom: 4 },
   tagText: { fontSize: 10, fontWeight: '700' },
   itemDesc: { fontSize: 11, marginTop: 4, fontStyle: 'italic', lineHeight: 16 },
+  actions: { flexDirection: 'column', gap: 6, flexShrink: 0 },
+  editBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  editBtnText: { fontSize: 16, fontWeight: '700' },
   deleteBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   deleteBtnText: { fontSize: 16, fontWeight: '700' },
 });
@@ -218,39 +304,50 @@ export default function SchedulesScreen() {
     event: [],
     suspension: [],
   });
+  const [editingItem, setEditingItem] = useState<ScheduleItem | null>(null);
+  const [editForm, setEditForm] = useState({ title: '', time: '', room: '', description: '', tag: '' });
 
   const loadPostedEvents = async () => {
     try {
-      const posted = await getPostedCalendarEvents();
-      console.log('Loaded posted events:', posted);
+      const schedules = await getSchedules();
       const newData: Record<PostType, ScheduleItem[]> = {
         class: [],
         event: [],
         suspension: [],
       };
-      
-      posted.forEach((event) => {
-        const formattedDate = event.date
-          ? event.date.split('-').slice(1).join('-').replace('-', ' ').replace(/^0/, '')
-          : undefined;
-        
-        const item: ScheduleItem = {
-          id: event.id,
-          title: event.label,
-          tag: event.department || event.org || 'Posted',
-          date: formattedDate,
-          time: event.time,
-          room: event.room,
-          organization: event.org,
-          description: event.description,
-        };
-        
-        if (newData[event.type]) {
-          newData[event.type].unshift(item);
-        }
+
+      schedules.forEach((schedule) => {
+        const postType: PostType =
+          schedule.type === 'Class Schedules' ? 'class' :
+          schedule.type === 'Events' ? 'event' : 'suspension';
+
+        const subjects = schedule.subjects && schedule.subjects.length > 0
+          ? schedule.subjects
+          : [{ name: schedule.tag || 'Untitled', day: '', timeRange: '', room: '' }];
+
+        subjects.forEach((subject, subjectIndex) => {
+          const formattedDate = subject.day && /^\d{4}-\d{2}-\d{2}$/.test(subject.day)
+            ? subject.day.split('-').slice(1).join('-').replace('-', ' ').replace(/^0/, '')
+            : subject.day || undefined;
+
+          const item: ScheduleItem = {
+            id: `${schedule._id}-${subjectIndex}`,
+            scheduleId: schedule._id,
+            subjectIndex,
+            scheduleType: schedule.type,
+            title: subject.name,
+            tag: schedule.tag || schedule.course || schedule.department || 'Posted',
+            date: formattedDate,
+            time: subject.timeRange,
+            room: subject.room,
+            organization: schedule.department,
+            description: schedule.semester || schedule.yearLevel,
+          };
+
+          newData[postType].unshift(item);
+        });
       });
-      
-      console.log('Data after load:', newData);
+
       setData(newData);
     } catch (error) {
       console.error('Error loading events:', error);
@@ -265,18 +362,60 @@ export default function SchedulesScreen() {
 
   const handleDelete = async (id: string) => {
     try {
-      console.log('=== DELETE START ===');
-      console.log('Deleting item with id:', id);
-      console.log('Current data state:', data);
-      
-      await deletePostedCalendarEvent(id);
-      console.log('Item deleted from storage');
-      
+      const scheduleId = id.includes('-') ? id.split('-')[0] : id;
+      await deleteSchedule(scheduleId);
       await loadPostedEvents();
-      console.log('Events reloaded, new data state:', data);
-      console.log('=== DELETE COMPLETE ===');
+      Alert.alert('Success', 'Schedule deleted successfully');
     } catch (error) {
       console.error('Delete failed:', error);
+      Alert.alert('Error', 'Failed to delete schedule');
+    }
+  };
+
+  const handleEdit = (item: ScheduleItem) => {
+    setEditingItem(item);
+    setEditForm({
+      title: item.title,
+      time: item.time || '',
+      room: item.room || '',
+      description: item.description || '',
+      tag: item.tag || '',
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingItem) return;
+    try {
+      const scheduleId = editingItem.scheduleId;
+      const existing = await getSchedules();
+      const currentSchedule = existing.find((s) => s._id === scheduleId);
+
+      if (!currentSchedule) {
+        Alert.alert('Error', 'Schedule no longer exists');
+        return;
+      }
+
+      const nextSubjects = [...(currentSchedule.subjects || [])];
+      if (nextSubjects[editingItem.subjectIndex]) {
+        nextSubjects[editingItem.subjectIndex] = {
+          ...nextSubjects[editingItem.subjectIndex],
+          name: editForm.title,
+          timeRange: editForm.time || 'TBA',
+          room: editForm.room || undefined,
+        };
+      }
+
+      await updateSchedule(scheduleId, {
+        tag: editForm.tag || currentSchedule.tag,
+        subjects: nextSubjects,
+      });
+
+      setEditingItem(null);
+      await loadPostedEvents();
+      Alert.alert('Success', 'Schedule updated successfully');
+    } catch (error) {
+      console.error('Update failed:', error);
+      Alert.alert('Error', 'Failed to update schedule');
     }
   };
 
@@ -292,11 +431,95 @@ export default function SchedulesScreen() {
         <Text style={[styles.pageTitle, { color: theme.title }]}>All Schedules Posted</Text>
 
         {typeOrder.map(type => (
-          <AccordionSection key={type} type={type} items={data[type]} onDelete={handleDelete} />
+          <AccordionSection key={type} type={type} items={data[type]} onDelete={handleDelete} onEdit={handleEdit} />
         ))}
 
         <View style={{ height: 24 }} />
       </ScrollView>
+
+      <Modal
+        visible={!!editingItem}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditingItem(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setEditingItem(null)}
+        />
+        <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+          <Text style={[styles.modalTitle, { color: theme.title }]}>Edit Schedule</Text>
+          
+          <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Title</Text>
+          <TextInput
+            style={[styles.modalInput, { backgroundColor: theme.input, color: theme.text, borderColor: theme.divider }]}
+            value={editForm.title}
+            onChangeText={text => setEditForm(prev => ({ ...prev, title: text }))}
+            placeholder="Enter title"
+            placeholderTextColor={theme.muted}
+          />
+
+          <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Tag (Department/Group)</Text>
+          <Dropdown
+            value={editForm.tag}
+            options={[
+              ...DEPARTMENTS,
+              ...COURSES.CICT.map(c => `${c}`),
+              ...COURSES.CBME.map(c => `${c}`),
+              ...BLOCKS,
+              ...COURSES.CICT.map(c => BLOCKS.map(b => `${c} ${b}`)).flat(),
+              ...COURSES.CBME.map(c => BLOCKS.map(b => `${c} ${b}`)).flat(),
+            ]}
+            onSelect={val => setEditForm(prev => ({ ...prev, tag: val }))}
+            placeholder="Select department, course, or block"
+          />
+
+          <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Time</Text>
+          <TextInput
+            style={[styles.modalInput, { backgroundColor: theme.input, color: theme.text, borderColor: theme.divider }]}
+            value={editForm.time}
+            onChangeText={text => setEditForm(prev => ({ ...prev, time: text }))}
+            placeholder="e.g., 10:00 AM - 12:00 PM"
+            placeholderTextColor={theme.muted}
+          />
+
+          <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Room</Text>
+          <TextInput
+            style={[styles.modalInput, { backgroundColor: theme.input, color: theme.text, borderColor: theme.divider }]}
+            value={editForm.room}
+            onChangeText={text => setEditForm(prev => ({ ...prev, room: text }))}
+            placeholder="e.g., Room 101"
+            placeholderTextColor={theme.muted}
+          />
+
+          <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Description</Text>
+          <TextInput
+            style={[styles.modalInput, styles.modalTextArea, { backgroundColor: theme.input, color: theme.text, borderColor: theme.divider }]}
+            value={editForm.description}
+            onChangeText={text => setEditForm(prev => ({ ...prev, description: text }))}
+            placeholder="Enter description"
+            placeholderTextColor={theme.muted}
+            multiline
+            numberOfLines={3}
+          />
+
+          <View style={styles.modalActions}>
+            <TouchableOpacity
+              style={[styles.modalBtn, styles.modalBtnCancel, { backgroundColor: theme.muted + '30' }]}
+              onPress={() => setEditingItem(null)}
+            >
+              <Text style={[styles.modalBtnText, { color: theme.subtitle }]}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalBtn, styles.modalBtnSave, { backgroundColor: theme.accent }]}
+              onPress={handleSaveEdit}
+            >
+              <Text style={[styles.modalBtnText, { color: '#ffffff' }]}>Save</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <BottomNav role="admin" active="schedules" />
     </View>
@@ -308,7 +531,62 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingTop: 52, paddingBottom: 12 },
-
   pageTitle: { fontSize: 24, fontWeight: '700', letterSpacing: 0.5, marginBottom: 24 },
-
+  
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  modalContent: {
+    position: 'absolute',
+    top: '15%',
+    left: 20,
+    right: 20,
+    borderRadius: 16,
+    padding: 20,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  modalLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 6,
+    marginTop: 8,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+  },
+  modalTextArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalBtnCancel: {},
+  modalBtnSave: {},
+  modalBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
 });

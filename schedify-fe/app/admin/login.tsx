@@ -1,17 +1,40 @@
-import { ScrollView, Text, View, TouchableOpacity, TextInput, StyleSheet, StatusBar, Image } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, TextInput, StyleSheet, StatusBar, Image, Alert } from "react-native";
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
+import { Ionicons } from '@expo/vector-icons';
+import { login as apiLogin } from "../../utils/apiClient";
 
 export default function AdminLoginScreen() {
     const router = useRouter();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     
     const handleLogin = async () => {
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        console.log("Admin sign in:", { email, password });
-        router.push("/admin/dashboard" as any);
+        if (!email || !password) {
+            Alert.alert('Error', 'Please fill in all fields');
+            return;
+        }
+
+        setLoading(true);
+        
+        try {
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            const response = await apiLogin(email, password, 'admin');
+            
+            if (response.token) {
+                router.replace('/admin/dashboard' as any);
+            } else {
+                Alert.alert('Error', 'Failed to login');
+            }
+        } catch (error: any) {
+            console.error('Admin login error:', error);
+            Alert.alert('Login Failed', error.message || 'Invalid credentials');
+        } finally {
+            setLoading(false);
+        }
     };
     
     return (
@@ -48,23 +71,29 @@ export default function AdminLoginScreen() {
 
                         <View style={styles.inputGroup}>
                             <Text style={styles.label}>Password</Text>
-                            <TextInput 
-                                placeholder="Enter your password"
-                                placeholderTextColor="#9ba1a6"
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry
-                                style={styles.input}
-                            />
+                            <View style={styles.passwordContainer}>
+                                <TextInput 
+                                    placeholder="Enter your password"
+                                    placeholderTextColor="#9ba1a6"
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry={!showPassword}
+                                    style={styles.passwordInput}
+                                />
+                                <TouchableOpacity onPress={() => setShowPassword(prev => !prev)} style={styles.eyeButton}>
+                                    <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#cbd5e0" />
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     </View>
 
                     <TouchableOpacity
                         onPress={handleLogin}
-                        style={styles.button}
+                        style={[styles.button, loading && { opacity: 0.6 }]}
                         activeOpacity={0.8}
+                                            disabled={loading}
                     >
-                        <Text style={styles.buttonText}>Sign in</Text>
+                        <Text style={styles.buttonText}>{loading ? 'Signing in...' : 'Sign in'}</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>
@@ -130,6 +159,25 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#718096',
         fontSize: 16,
+    },
+    passwordContainer: {
+        backgroundColor: '#4a5568',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#718096',
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    passwordInput: {
+        flex: 1,
+        color: '#ffffff',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 16,
+    },
+    eyeButton: {
+        paddingHorizontal: 12,
+        paddingVertical: 10,
     },
     button: {
         backgroundColor: '#4a5568',

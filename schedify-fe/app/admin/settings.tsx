@@ -1,29 +1,58 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   StatusBar, Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../../ThemeContext';   
 import BottomNav from '../../components/BottomNav';
+import { getCurrentUser, logout as apiLogout } from '../../utils/apiClient';
 
 export default function SettingsScreen() {
  
   const { isDark, toggleTheme, theme } = useTheme();
+  const [admin, setAdmin] = useState({
+    name: 'Loading...',
+    email: '',
+  });
 
-  const admin = {
-    name: 'ADMIN',
-    email: 'Admin@gmail.com',
+  useFocusEffect(
+    React.useCallback(() => {
+      loadUserData();
+    }, [])
+  );
+
+  const loadUserData = async () => {
+    try {
+      const user = await getCurrentUser();
+      if (user) {
+        setAdmin({
+          name: user.name || 'Admin',
+          email: user.email || '',
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load user data:', error);
+    }
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Sign Out',
         style: 'destructive',
-        onPress: () => router.replace('/student/login' as any),
+        onPress: async () => {
+          try {
+            await apiLogout();
+            router.replace('/admin/welcome' as any);
+          } catch (error) {
+            console.error('Logout error:', error);
+            router.replace('/admin/welcome' as any);
+          }
+        },
       },
     ]);
   };

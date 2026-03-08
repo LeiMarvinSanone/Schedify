@@ -5,11 +5,15 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Picker } from '@react-native-picker/picker';
+import { Ionicons } from '@expo/vector-icons';
+import { login as apiLogin } from '../../utils/apiClient';
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [role, setRole] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (name: string, value: string) => {
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -30,14 +34,18 @@ const Login = () => {
     }
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 300));
+      setIsLoading(true);
+      await apiLogin(formData.email, formData.password, role);
+
       if (role === 'admin') {
         router.replace('/admin/dashboard' as any);
       } else {
         router.replace('/student/calendar' as any);
       }
     } catch {
-      Alert.alert('Error', 'Navigation failed. Please try again.');
+      Alert.alert('Error', 'Login failed. Invalid email or password.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -76,14 +84,19 @@ const Login = () => {
 
       <View style={styles.formGroup}>
         <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={[styles.input, errors.password && styles.inputError]}
-          value={formData.password}
-          onChangeText={(val) => handleChange('password', val)}
-          placeholder="Enter your password"
-          placeholderTextColor="#a0aec0"
-          secureTextEntry
-        />
+        <View style={[styles.passwordContainer, errors.password && styles.inputError]}>
+          <TextInput
+            style={styles.passwordInput}
+            value={formData.password}
+            onChangeText={(val) => handleChange('password', val)}
+            placeholder="Enter your password"
+            placeholderTextColor="#a0aec0"
+            secureTextEntry={!showPassword}
+          />
+          <TouchableOpacity onPress={() => setShowPassword(prev => !prev)} style={styles.eyeButton}>
+            <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#cbd5e0" />
+          </TouchableOpacity>
+        </View>
         {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
       </View>
 
@@ -104,8 +117,8 @@ const Login = () => {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.button} onPress={handleSubmit} activeOpacity={0.8}>
-        <Text style={styles.buttonText}>Login</Text>
+      <TouchableOpacity style={styles.button} disabled={isLoading} onPress={handleSubmit} activeOpacity={0.8}>
+        <Text style={styles.buttonText}>{isLoading ? 'Logging in...' : 'Login'}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => router.push('/student/signup' as any)}>
@@ -161,6 +174,24 @@ const styles = StyleSheet.create({
     fontSize: 15,
     borderWidth: 2,
     borderColor: 'transparent',
+  },
+  passwordContainer: {
+    backgroundColor: '#5a6778',
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  passwordInput: {
+    flex: 1,
+    color: '#ffffff',
+    padding: 14,
+    fontSize: 15,
+  },
+  eyeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   inputError: {
     borderColor: '#fc8181',

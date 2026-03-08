@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Switch, StatusBar, Alert, ScrollView, Image,
+  Switch, StatusBar, ScrollView, Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
@@ -17,6 +17,21 @@ import {
   type ReminderOption,
 } from '../../utils/classReminderStore';
 import { syncClassReminderNotifications } from '../../utils/classReminderScheduler';
+import {
+  getCurrentUser,
+  logout as apiLogout,
+} from '../../utils/apiClient';
+
+interface UserProfile {
+  id?: string;
+  name: string;
+  email: string;
+  idNo: string;
+  department: string;
+  course: string;
+  block: string;
+  role: string;
+}
 
 const AvatarIcon = ({ color }: { color: string }) => (
   <Svg width="52" height="52" viewBox="0 0 48 48" fill="none">
@@ -71,18 +86,25 @@ const BlockIcon = ({ color }: { color: string }) => (
 export default function Profile() {
   const { isDark, toggleTheme, theme: t } = useTheme();
   const [defaultReminder, setDefaultReminder] = useState<ReminderOption>('30m');
+  const [account, setAccount] = useState<UserProfile | null>(null);
 
-  const handleLogout = () => {
-    Alert.alert('Log Out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Log Out', style: 'destructive', onPress: () => router.replace('/student/login' as any) },
-    ]);
+  const handleLogout = async () => {
+    try {
+      await apiLogout();
+    } finally {
+      router.replace('/student/login' as any);
+    }
   };
 
+  const displayName = account?.name || 'Student';
+  const displayRole = account?.role || 'Student';
+  const displayEmail = account?.email || '';
+
   const infoItems = [
-    { icon: <DepartmentIcon color={t.accent} />, label: 'Department', value: 'CICT' },
-    { icon: <CourseIcon color={t.accent} />, label: 'Course', value: 'BSCS' },
-    { icon: <BlockIcon color={t.accent} />, label: 'Block', value: 'Block B — 3-B' },
+    { icon: <DepartmentIcon color={t.accent} />, label: 'Department', value: account?.department || 'N/A' },
+    { icon: <CourseIcon color={t.accent} />, label: 'Course', value: account?.course || 'N/A' },
+    { icon: <BlockIcon color={t.accent} />, label: 'Block', value: account?.block || 'N/A' },
+    { icon: <BlockIcon color={t.accent} />, label: 'ID No.', value: account?.idNo || 'N/A' },
   ];
 
   const reloadReminderSettings = useCallback(async () => {
@@ -93,6 +115,23 @@ export default function Profile() {
   useEffect(() => {
     void reloadReminderSettings();
   }, [reloadReminderSettings]);
+
+  useEffect(() => {
+    const loadAccount = async () => {
+      try {
+        const current = await getCurrentUser();
+        if (!current) {
+          router.replace('/student/login' as any);
+          return;
+        }
+        setAccount(current);
+      } catch {
+        router.replace('/student/login' as any);
+      }
+    };
+
+    void loadAccount();
+  }, []);
 
   const handleDefaultReminderChange = async (option: ReminderOption) => {
     await setDefaultClassReminder(option);
@@ -130,7 +169,7 @@ export default function Profile() {
         </View>
       </View>
 
-      
+
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={[styles.heroCard, { backgroundColor: t.card, borderColor: t.cardBorder }]}>
@@ -140,11 +179,11 @@ export default function Profile() {
             </View>
           </View>
           <View style={styles.heroInfo}>
-            <Text style={[styles.heroName, { color: t.title }]}>Student A</Text>
+            <Text style={[styles.heroName, { color: t.title }]}>{displayName}</Text>
             <View style={[styles.badge, { backgroundColor: t.badgeBg }]}>
-              <Text style={[styles.badgeText, { color: t.badgeText }]}>● Student</Text>
+              <Text style={[styles.badgeText, { color: t.badgeText }]}>{`● ${displayRole}`}</Text>
             </View>
-            <Text style={[styles.heroEmail, { color: t.subtitle }]}>StudentA@gmail.com</Text>
+            <Text style={[styles.heroEmail, { color: t.subtitle }]}>{displayEmail}</Text>
           </View>
         </View>
 
