@@ -48,13 +48,35 @@ export const getSchedules = async (req, res) => {
     // Fetch full user details from database
     const user = await User.findById(req.user.id);
 
+    const userFields = {
+      department: user.department,
+      course: user.course,
+      yearLevel: user.yearLevel,
+      block: user.block,
+    };
+
+    const targetFields = ['department', 'course', 'yearLevel', 'block'];
+
     const schedules = await Schedule.find({
       $or: [
-        { tag: 'whole-university' },
-        { department: user.department },
-        { course: user.course },
-        { block: user.block },
-      ]
+        { tag: 'whole-university' }, // Legacy universal tag
+        {
+          $and: targetFields.map((field) => {
+            const value = userFields[field];
+
+            // If schedule field is not set, it applies to everyone for that field.
+            // If schedule field is set, it must match the student's value exactly.
+            return {
+              $or: [
+                { [field]: { $exists: false } },
+                { [field]: null },
+                { [field]: '' },
+                { [field]: value },
+              ],
+            };
+          }),
+        },
+      ],
     });
 
     res.status(200).json(schedules);

@@ -19,6 +19,7 @@ const userSchema = new mongoose.Schema({
   // Academic info (for tag-based filtering)
   department: { type: String },
   course: { type: String },
+  yearLevel: { type: String },
   block: { type: String },
 
   // For Expo push notifications

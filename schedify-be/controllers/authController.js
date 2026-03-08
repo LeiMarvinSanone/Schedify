@@ -5,7 +5,11 @@ import jwt from 'jsonwebtoken';
 // Register a new user (student or professor only)
 export const register = async (req, res) => {
   try {
-    const { name, email, password, idNo, department, course, block, expoPushToken } = req.body;
+    const { name, email, password, idNo, department, course, yearLevel, block, expoPushToken } = req.body;
+
+    if (!name || !email || !password || !idNo || !department || !course || !yearLevel || !block) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
 
     // Check if email already exists
     const existingEmail = await User.findOne({ email });
@@ -27,6 +31,7 @@ export const register = async (req, res) => {
       role: 'student', // always student on public register
       department,
       course,
+      yearLevel,
       block,
       expoPushToken,
     });
@@ -45,9 +50,11 @@ export const register = async (req, res) => {
         id: newUser._id,
         name: newUser.name,
         email: newUser.email,
+        idNo: newUser.idNo,
         role: newUser.role,
         department: newUser.department,
         course: newUser.course,
+        yearLevel: newUser.yearLevel,
         block: newUser.block,
       }
     });
@@ -83,11 +90,80 @@ export const login = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        idNo: user.idNo,
         role: user.role,
         department: user.department,
         course: user.course,
+        yearLevel: user.yearLevel,
         block: user.block,
       }
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+};
+
+// Change password for authenticated user
+export const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    // Validate input
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Current password and new password are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "New password must be at least 6 characters" });
+    }
+
+    // Get user from database
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Verify current password
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Current password is incorrect" });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    user.password = hashedPassword;
+    await user.save();
+
+    res.status(200).json({ message: "Password updated successfully" });
+
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+};
+
+// Get current user data
+export const getMe = async (req, res) => {
+  try {
+    // Get user from database (req.user.id set by verifyToken middleware)
+    const user = await User.findById(req.user.id).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      idNo: user.idNo,
+      role: user.role,
+      department: user.department,
+      course: user.course,
+      yearLevel: user.yearLevel,
+      block: user.block,
     });
 
   } catch (error) {
