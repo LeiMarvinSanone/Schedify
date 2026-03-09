@@ -36,12 +36,30 @@ export const createSchedule = async (req, res) => {
   }
 };
 
-// GET all schedules (filtered by user's role, course, block)
+// GET all schedules (filtered by user's role, course, block + search)
 export const getSchedules = async (req, res) => {
   try {
+    const { search } = req.query;
+
+    // Build search filter
+    const searchFilter = search ? {
+      $or: [
+        { type: { $regex: search, $options: 'i' } },
+        { department: { $regex: search, $options: 'i' } },
+        { course: { $regex: search, $options: 'i' } },
+        { yearLevel: { $regex: search, $options: 'i' } },
+        { block: { $regex: search, $options: 'i' } },
+        { semester: { $regex: search, $options: 'i' } },
+        { tag: { $regex: search, $options: 'i' } },
+        { 'subjects.name': { $regex: search, $options: 'i' } },
+        { 'subjects.day': { $regex: search, $options: 'i' } },
+        { 'subjects.room': { $regex: search, $options: 'i' } },
+      ]
+    } : {};
+
     // Admin sees all schedules
     if (req.user.role === 'admin') {
-      const schedules = await Schedule.find();
+      const schedules = await Schedule.find(searchFilter);
       return res.status(200).json(schedules);
     }
 
@@ -57,15 +75,12 @@ export const getSchedules = async (req, res) => {
 
     const targetFields = ['department', 'course', 'yearLevel', 'block'];
 
-    const schedules = await Schedule.find({
+    const tagFilter = {
       $or: [
-        { tag: 'whole-university' }, // Legacy universal tag
+        { tag: 'whole-university' },
         {
           $and: targetFields.map((field) => {
             const value = userFields[field];
-
-            // If schedule field is not set, it applies to everyone for that field.
-            // If schedule field is set, it must match the student's value exactly.
             return {
               $or: [
                 { [field]: { $exists: false } },
@@ -77,8 +92,14 @@ export const getSchedules = async (req, res) => {
           }),
         },
       ],
-    });
+    };
 
+    // Combine tag filter and search filter
+    const finalFilter = search ? {
+      $and: [tagFilter, searchFilter]
+    } : tagFilter;
+
+    const schedules = await Schedule.find(finalFilter);
     res.status(200).json(schedules);
 
   } catch (error) {
