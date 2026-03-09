@@ -215,8 +215,12 @@ function SearchDropdown({ results, isDark, onSelect, onClose }: {
   const emptyClr = isDark ? '#4a5878' : '#94a3b8';
 
   return (
-    <Modal transparent visible animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={sr.backdrop} activeOpacity={1} onPress={onClose} />
+    <>
+      <TouchableOpacity 
+        style={sr.backdrop} 
+        activeOpacity={1} 
+        onPress={onClose}
+      />
 
       <View style={[sr.dropdown, { backgroundColor: bg, borderColor: border, top: 118 }]}>
         {results.length === 0 ? (
@@ -270,16 +274,16 @@ function SearchDropdown({ results, isDark, onSelect, onClose }: {
           />
         )}
       </View>
-    </Modal>
+    </>
   );
 }
 const sr = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFillObject },
+  backdrop: { position: 'absolute', top: 118, left: 0, right: 0, bottom: 0, zIndex: 999 },
   dropdown: {
     position: 'absolute', left: 12, right: 12,
     borderRadius: 14, borderWidth: 1,
     maxHeight: 320, overflow: 'hidden',
-    elevation: 20,
+    elevation: 20, zIndex: 1000,
     shadowColor: '#000', shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4, shadowRadius: 12,
   },
