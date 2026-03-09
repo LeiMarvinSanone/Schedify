@@ -26,6 +26,7 @@ const SignUp = () => {
     idNo: '',
     department: '',
     course: '',
+    yearLevel: '',
     block: '',
   });
   const [role, setRole] = useState<Role>('Student');
