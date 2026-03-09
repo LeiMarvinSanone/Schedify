@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, StatusBar, TextInput,
@@ -546,7 +546,19 @@ const mv = StyleSheet.create({
   legendText: { fontSize: 11 },
 });
 // calendar
-function MiniCalendar({ year, month, isDark }: { year: number; month: number; isDark: boolean }) {
+function MiniCalendar({
+  year,
+  month,
+  isDark,
+  eventsByDate,
+  onPressDate,
+}: {
+  year: number;
+  month: number;
+  isDark: boolean;
+  eventsByDate: Record<string, CalEvent[]>;
+  onPressDate: (year: number, month: number, day: number) => void;
+}) {
   const days = getDaysInMonth(year, month);
   const firstDay = getFirstDaySun(year, month);
   const cells: (number | null)[] = Array(firstDay).fill(null);
@@ -557,7 +569,21 @@ function MiniCalendar({ year, month, isDark }: { year: number; month: number; is
       <Text style={[mini.title, { color: isDark ? '#e2e8f0' : '#1e293b' }]}>{SHORT_MONTHS[month]} {year}</Text>
       <View style={mini.grid}>
         {['S','M','T','W','T','F','S'].map((d, i) => <Text key={i} style={[mini.dayHead, { color: isDark ? '#64748b' : '#94a3b8' }]}>{d}</Text>)}
-        {cells.map((d, i) => <Text key={i} style={[mini.cell, { color: isDark ? '#94a3b8' : '#475569' }, d === null && { opacity: 0 }]}>{d ?? ''}</Text>)}
+        {cells.map((d, i) => {
+          if (d === null) {
+            return <View key={i} style={[mini.cellWrap, { opacity: 0 }]}><Text style={mini.cell}>0</Text></View>;
+          }
+
+          const key = dateKey(year, month, d);
+          const count = (eventsByDate[key] || []).length;
+
+          return (
+            <TouchableOpacity key={i} style={mini.cellWrap} onPress={() => onPressDate(year, month, d)} activeOpacity={0.7}>
+              <Text style={[mini.cell, { color: isDark ? '#94a3b8' : '#475569' }]}>{d}</Text>
+              {count > 0 && <View style={[mini.dot, { backgroundColor: '#3b82f6' }]} />}
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </View>
   );
@@ -567,16 +593,40 @@ const mini = StyleSheet.create({
   title: { fontSize: 10, fontWeight: '700', marginBottom: 6 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   dayHead: { width: '14.28%', textAlign: 'center', fontSize: 8, fontWeight: '700', marginBottom: 2 },
-  cell: { width: '14.28%', textAlign: 'center', fontSize: 9, paddingVertical: 2 },
+  cellWrap: { width: '14.28%', alignItems: 'center', paddingVertical: 1 },
+  cell: { textAlign: 'center', fontSize: 9, minHeight: 12 },
+  dot: { width: 4, height: 4, borderRadius: 2, marginTop: 1 },
 });
 
-function YearView({ year, isDark }: { year: number; isDark: boolean }) {
+function YearView({
+  year,
+  isDark,
+  eventsByDate,
+  onPressDate,
+}: {
+  year: number;
+  isDark: boolean;
+  eventsByDate: Record<string, CalEvent[]>;
+  onPressDate: (year: number, month: number, day: number) => void;
+}) {
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
       {Array.from({ length: 6 }, (_, i) => (
         <View key={i} style={{ flexDirection: 'row', marginBottom: 4 }}>
-          <MiniCalendar year={year} month={i * 2} isDark={isDark} />
-          <MiniCalendar year={year} month={i * 2 + 1} isDark={isDark} />
+          <MiniCalendar
+            year={year}
+            month={i * 2}
+            isDark={isDark}
+            eventsByDate={eventsByDate}
+            onPressDate={onPressDate}
+          />
+          <MiniCalendar
+            year={year}
+            month={i * 2 + 1}
+            isDark={isDark}
+            eventsByDate={eventsByDate}
+            onPressDate={onPressDate}
+          />
         </View>
       ))}
     </ScrollView>
@@ -584,49 +634,93 @@ function YearView({ year, isDark }: { year: number; isDark: boolean }) {
 }
 
 // week view
-const WEEK_EVENTS_DATA: {
-  day: number;
-  row: number;
-  rowSpan: number;
-  label: string;
-  color: string;
-}[] = [];
-function WeekView({ isDark }: { isDark: boolean }) {
-  const COL_WIDTH = (width - 32) / 7;
-  const ROW_HEIGHT = 72;
-  const ROWS = 7;
-  const gridColor  = isDark ? '#2d3f55' : '#e2e8f0';
+function WeekView({
+  isDark,
+  year,
+  month,
+  selectedDate,
+  eventsByDate,
+}: {
+  isDark: boolean;
+  year: number;
+  month: number;
+  selectedDate: number | null;
+  eventsByDate: Record<string, CalEvent[]>;
+}) {
+  const baseDate = selectedDate
+    ? new Date(year, month, selectedDate)
+    : new Date(year, month, 1);
+
+  const weekStart = new Date(baseDate);
+  weekStart.setDate(baseDate.getDate() - baseDate.getDay());
+
+  const weekDates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart);
+    d.setDate(weekStart.getDate() + i);
+    return d;
+  });
+
   const headerBg   = isDark ? '#1e2a3a' : '#f1f5f9';
   const headerText = isDark ? '#e2e8f0' : '#334155';
+  const cardBg     = isDark ? '#1a2536' : '#ffffff';
+  const cardBorder = isDark ? '#2d3f55' : '#e2e8f0';
+  const mutedText  = isDark ? '#94a3b8' : '#64748b';
+  const labelText  = isDark ? '#e2e8f0' : '#1e293b';
+
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
       <View style={[wv.header, { backgroundColor: headerBg }]}>
         {WEEK_DAYS_SUN.map((d, i) => (
-          <View key={i} style={[wv.headerCell, { width: COL_WIDTH }]}>
+          <View key={i} style={wv.headerCell}>
             <Text style={[wv.headerText, { color: headerText }]}>{d}</Text>
           </View>
         ))}
       </View>
-      <View style={{ position: 'relative', height: ROWS * ROW_HEIGHT }}>
-        {Array.from({ length: ROWS + 1 }).map((_, r) => <View key={`r${r}`} style={[wv.rowLine, { top: r * ROW_HEIGHT, backgroundColor: gridColor }]} />)}
-        {Array.from({ length: 8 }).map((_, c) => <View key={`c${c}`} style={[wv.colLine, { left: c * COL_WIDTH, height: ROWS * ROW_HEIGHT, backgroundColor: gridColor }]} />)}
-        {WEEK_EVENTS_DATA.map((ev, i) => (
-          <View key={i} style={[wv.event, { left: ev.day * COL_WIDTH + 2, top: ev.row * ROW_HEIGHT + 2, width: COL_WIDTH - 4, height: ROW_HEIGHT * ev.rowSpan - 4, backgroundColor: ev.color + '22', borderLeftColor: ev.color }]}>
-            <Text style={[wv.eventText, { color: ev.color }]}>{ev.label}</Text>
+
+      {weekDates.map((d) => {
+        const key = dateKey(d.getFullYear(), d.getMonth(), d.getDate());
+        const dayEvents = eventsByDate[key] || [];
+
+        return (
+          <View key={key} style={[wv.dayCard, { backgroundColor: cardBg, borderColor: cardBorder }]}> 
+            <View style={wv.dayHeader}>
+              <Text style={[wv.dayTitle, { color: labelText }]}>{MONTHS[d.getMonth()]} {d.getDate()}</Text>
+              <Text style={[wv.dayCount, { color: mutedText }]}>{dayEvents.length} event{dayEvents.length === 1 ? '' : 's'}</Text>
+            </View>
+
+            {dayEvents.length === 0 ? (
+              <Text style={[wv.emptyText, { color: mutedText }]}>No events</Text>
+            ) : (
+              <View style={wv.eventList}>
+                {dayEvents.map((ev, i) => (
+                  <View key={`${key}-${i}`} style={[wv.eventItem, { borderLeftColor: isDark ? EVENT_COLORS_DARK[ev.type].border : EVENT_COLORS_LIGHT[ev.type].border }]}>
+                    <Text style={[wv.eventLabel, { color: labelText }]} numberOfLines={1}>{ev.label}</Text>
+                    <Text style={[wv.eventMeta, { color: mutedText }]} numberOfLines={1}>
+                      {TYPE_LABELS[ev.type]}{ev.time ? ` • ${ev.time}` : ''}{ev.room ? ` • ${ev.room}` : ''}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
-        ))}
-      </View>
+        );
+      })}
     </ScrollView>
   );
 }
 const wv = StyleSheet.create({
-  header: { flexDirection: 'row', borderRadius: 8, marginBottom: 4, paddingVertical: 12 },
-  headerCell: { alignItems: 'center' },
-  headerText: { fontSize: 15, fontWeight: '600' },
-  rowLine: { position: 'absolute', height: 1, width: '100%' },
-  colLine: { position: 'absolute', width: 1 },
-  event: { position: 'absolute', borderRadius: 6, padding: 5, justifyContent: 'center', borderLeftWidth: 3 },
-  eventText: { fontSize: 9, fontWeight: '700', textAlign: 'center' },
+  header: { flexDirection: 'row', borderRadius: 8, marginBottom: 6, paddingVertical: 10 },
+  headerCell: { flex: 1, alignItems: 'center' },
+  headerText: { fontSize: 13, fontWeight: '700' },
+  dayCard: { borderWidth: 1, borderRadius: 10, padding: 10, marginBottom: 8 },
+  dayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  dayTitle: { fontSize: 13, fontWeight: '700' },
+  dayCount: { fontSize: 11 },
+  emptyText: { fontSize: 12 },
+  eventList: { gap: 6 },
+  eventItem: { borderLeftWidth: 3, paddingLeft: 8 },
+  eventLabel: { fontSize: 12, fontWeight: '700' },
+  eventMeta: { fontSize: 10 },
 });
 
 function ViewSwitcher({ current, onChange, isDark }: { current: ViewType; onChange: (v: ViewType) => void; isDark: boolean }) {
@@ -676,46 +770,38 @@ export default function CalendarScreen() {
   const [focusedEventIndex, setFocusedEventIndex] = useState<number | null>(null);
   const [eventsByDate, setEventsByDate] = useState<Record<string, CalEvent[]>>(DEFAULT_EVENTS);
 
+  const loadSchedules = useCallback(async (searchText?: string) => {
+    try {
+      const schedules = await getSchedules(searchText);
+      setEventsByDate(transformBackendSchedules(schedules));
+    } catch (error) {
+      console.error('Failed to load schedules:', error);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      let active = true;
-
-      (async () => {
-        try {
-          const schedules = await getSchedules();
-          if (!active) return;
-          setEventsByDate(transformBackendSchedules(schedules));
-        } catch (error) {
-          console.error('Failed to load schedules:', error);
-        }
-      })();
-
-      return () => {
-        active = false;
-      };
-    }, [])
+      setSearch('');
+      setShowDropdown(false);
+      void loadSchedules();
+      return undefined;
+    }, [loadSchedules])
   );
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void loadSchedules(search);
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [search, loadSchedules]);
 
   const searchIndex = useMemo(() => buildSearchIndex(eventsByDate), [eventsByDate]);
 
-
   const searchResults = useMemo<SearchResult[]>(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim();
     if (!q) return [];
-    return searchIndex.filter(r => {
-      const ev = r.event;
-      return (
-        ev.label.toLowerCase().includes(q) ||
-        ev.type.toLowerCase().includes(q)  ||
-        TYPE_LABELS[ev.type].toLowerCase().includes(q) ||
-        (ev.room?.toLowerCase().includes(q) ?? false) ||
-        (ev.building?.toLowerCase().includes(q) ?? false) ||
-        (ev.department?.toLowerCase().includes(q) ?? false) ||
-        (ev.org?.toLowerCase().includes(q)  ?? false) ||
-        (ev.tag?.toLowerCase().includes(q) ?? false) ||
-        (ev.description?.toLowerCase().includes(q) ?? false)
-      );
-    });
+    return searchIndex;
   }, [search, searchIndex]);
 
   const handleSearchChange = (text: string) => {
@@ -731,6 +817,14 @@ export default function CalendarScreen() {
     setMonth(r.month);
     setSelectedDate(r.day);
     setFocusedEventIndex(r.eventIndex);
+  };
+
+  const handlePressYearDate = (targetYear: number, targetMonth: number, targetDay: number) => {
+    setView('Month');
+    setYear(targetYear);
+    setMonth(targetMonth);
+    setSelectedDate(targetDay);
+    setFocusedEventIndex(null);
   };
 
   const screenBg      = isDark ? '#0f172a' : '#f0f4f8';
@@ -802,8 +896,23 @@ export default function CalendarScreen() {
           <MonthView year={year} month={month} onPrev={handlePrev} onNext={handleNext}
             onSelectDate={handleSelectDate} isDark={isDark} eventsByDate={eventsByDate} />
         )}
-        {view === 'Year'  && <YearView year={year} isDark={isDark} />}
-        {view === 'Week'  && <WeekView isDark={isDark} />}
+        {view === 'Year'  && (
+          <YearView
+            year={year}
+            isDark={isDark}
+            eventsByDate={eventsByDate}
+            onPressDate={handlePressYearDate}
+          />
+        )}
+        {view === 'Week'  && (
+          <WeekView
+            isDark={isDark}
+            year={year}
+            month={month}
+            selectedDate={selectedDate}
+            eventsByDate={eventsByDate}
+          />
+        )}
       </View>
 
       {view === 'Month' && (
