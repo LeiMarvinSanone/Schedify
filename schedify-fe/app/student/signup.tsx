@@ -16,6 +16,7 @@ const COURSES: Record<string, string[]> = {
 };
 
 const DEPARTMENTS = Object.keys(COURSES);
+const YEAR_LEVELS = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
 const BLOCKS = ['Block A', 'Block B', 'Block C', 'Block D'];
 
 const SignUp = () => {
@@ -42,7 +43,7 @@ const SignUp = () => {
   };
 
   const handleSubmit = async () => {
-    const { name, email, password, idNo, department, course, block } = formData;
+    const { name, email, password, idNo, department, course, yearLevel, block } = formData;
     const nextErrors: Record<string, string> = {};
 
     if (!name.trim()) nextErrors.name = 'Name is required';
@@ -51,6 +52,7 @@ const SignUp = () => {
     if (!idNo.trim()) nextErrors.idNo = 'ID number is required';
     if (!department.trim()) nextErrors.department = 'Department is required';
     if (!course.trim()) nextErrors.course = 'Course is required';
+    if (!yearLevel.trim()) nextErrors.yearLevel = 'Year level is required';
     if (!block.trim()) nextErrors.block = 'Block is required';
 
     if (Object.keys(nextErrors).length > 0) {
@@ -69,6 +71,7 @@ const SignUp = () => {
         idNo: idNo.trim(),
         department: department.trim(),
         course: course.trim(),
+        yearLevel: yearLevel.trim(),
         block: block.trim(),
         role,
       });
@@ -213,21 +216,43 @@ const SignUp = () => {
           </View>
         </View>
 
-        <Text style={styles.label}>Block</Text>
-        <View style={[styles.pickerWrapper, styles.blockPickerWidth, !!errors.block && styles.inputError]}>
-          <Picker
-            selectedValue={formData.block}
-            onValueChange={val => update('block', val)}
-            style={styles.picker}
-            dropdownIconColor="#8a9bb0"
-          >
-            <Picker.Item label="Select Block" value="" color="#999" />
-            {BLOCKS.map(b => (
-              <Picker.Item key={b} label={b} value={b} color="#333" />
-            ))}
-          </Picker>
+        <View style={styles.row}>
+          <View style={styles.half}>
+            <Text style={styles.label}>Year Level</Text>
+            <View style={[styles.pickerWrapper, !!errors.yearLevel && styles.inputError]}>
+              <Picker
+                selectedValue={formData.yearLevel}
+                onValueChange={val => update('yearLevel', val)}
+                style={styles.picker}
+                dropdownIconColor="#8a9bb0"
+              >
+                <Picker.Item label="Select Year Level" value="" color="#999" />
+                {YEAR_LEVELS.map(y => (
+                  <Picker.Item key={y} label={y} value={y} color="#333" />
+                ))}
+              </Picker>
+            </View>
+            {!!errors.yearLevel && <Text style={styles.errorText}>{errors.yearLevel}</Text>}
+          </View>
+
+          <View style={styles.half}>
+            <Text style={styles.label}>Block</Text>
+            <View style={[styles.pickerWrapper, !!errors.block && styles.inputError]}>
+              <Picker
+                selectedValue={formData.block}
+                onValueChange={val => update('block', val)}
+                style={styles.picker}
+                dropdownIconColor="#8a9bb0"
+              >
+                <Picker.Item label="Select Block" value="" color="#999" />
+                {BLOCKS.map(b => (
+                  <Picker.Item key={b} label={b} value={b} color="#333" />
+                ))}
+              </Picker>
+            </View>
+            {!!errors.block && <Text style={styles.errorText}>{errors.block}</Text>}
+          </View>
         </View>
-        {!!errors.block && <Text style={styles.errorText}>{errors.block}</Text>}
 
         <View style={styles.roleRow}>
           <View style={styles.roleTag}>

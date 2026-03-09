@@ -112,6 +112,7 @@ export interface SignupInput {
   idNo: string;
   department: string;
   course: string;
+  yearLevel: string;
   block: string;
   role: string;
 }
@@ -125,6 +126,7 @@ export interface AuthResponse {
     idNo: string;
     department: string;
     course: string;
+    yearLevel: string;
     block: string;
     role: string;
   };
@@ -139,7 +141,11 @@ export async function signup(signupData: SignupInput): Promise<AuthResponse> {
 
   const authData = extractAuthData(response);
   const userToStore = authData.user
-    ? { ...authData.user, idNo: authData.user.idNo || signupData.idNo }
+    ? { 
+        ...authData.user, 
+        idNo: authData.user.idNo || signupData.idNo,
+        yearLevel: authData.user.yearLevel || signupData.yearLevel 
+      }
     : undefined;
 
   if (authData.token) {
@@ -177,6 +183,12 @@ export async function login(
 
 export async function getCurrentUser(): Promise<AuthResponse['user']> {
   return await getStoredUser();
+}
+
+export async function fetchCurrentUser(): Promise<AuthResponse['user']> {
+  const user = await apiCall<AuthResponse['user']>('/api/auth/me', 'GET');
+  await setStoredUser(user);
+  return user;
 }
 
 export async function logout(): Promise<void> {
