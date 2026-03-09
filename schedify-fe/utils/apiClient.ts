@@ -240,8 +240,13 @@ export interface CreateScheduleInput {
   subjects?: ScheduleSubject[];
 }
 
-export async function getSchedules(): Promise<Schedule[]> {
-  return await apiCall<Schedule[]>('/api/schedules', 'GET');
+export async function getSchedules(search?: string): Promise<Schedule[]> {
+  const query = search?.trim();
+  const endpoint = query
+    ? `/api/schedules?search=${encodeURIComponent(query)}`
+    : '/api/schedules';
+
+  return await apiCall<Schedule[]>(endpoint, 'GET');
 }
 
 export async function getScheduleById(id: string): Promise<Schedule> {
