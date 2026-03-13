@@ -3,6 +3,7 @@ import User from '../models/User.js';
 import multer from 'multer';
 import { parse } from 'csv-parse';
 import fs from 'fs';
+import { sendPushNotifications } from '../utils/notificationHelper.js';
 
 // CREATE schedule (admin only)
 export const createSchedule = async (req, res) => {
@@ -42,6 +43,33 @@ export const createSchedule = async (req, res) => {
     });
 
     await newSchedule.save();
+
+    // Send push notifications to relevant users
+    let query = {};
+    if (tag === 'whole-university') {
+      query = {};
+    } else {
+      query = {
+        $or: [
+          { department },
+          { course },
+          { block },
+        ]
+      };
+    }
+
+    const users = await User.find({
+      ...query,
+      expoPushToken: { $exists: true, $ne: null }
+    });
+
+    const tokens = users.map(u => u.expoPushToken).filter(Boolean);
+
+    await sendPushNotifications(
+      tokens,
+      `New ${type}`,
+      `A new ${type.toLowerCase()} has been posted for you!`
+    );
 
     res.status(201).json({ message: "Schedule created successfully", schedule: newSchedule });
 
@@ -179,21 +207,17 @@ export const deleteSchedule = async (req, res) => {
 // BULK IMPORT schedules (admin only)
 export const importSchedules = async (req, res) => {
   try {
-    // Accepts JSON array of schedules
     const schedules = req.body.schedules;
     if (!Array.isArray(schedules) || schedules.length === 0) {
       return res.status(400).json({ message: 'No schedules provided.' });
     }
 
-    // Validate and save each schedule
     const results = [];
     for (const sched of schedules) {
-      // Basic validation
       if (!sched.name || !sched.day || !sched.timeRange || !sched.room || !sched.department || !sched.tag) {
         results.push({ status: 'error', schedule: sched, message: 'Missing required fields.' });
         continue;
       }
-      // Create schedule document
       const newSchedule = new Schedule({
         type: 'Class Schedules',
         department: sched.department,
@@ -234,11 +258,10 @@ export const importSchedulesCSV = [
     const errors = [];
     let hasError = false;
     const validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const timeRegex = /^\d{1,2}:\d{2}(?:\s*-\s*\d{1,2}:\d{2})?$/; // e.g. 08:00 or 08:00 - 10:00
+    const timeRegex = /^\d{1,2}:\d{2}(?:\s*-\s*\d{1,2}:\d{2})?$/;
     fs.createReadStream(req.file.path)
       .pipe(parse({ columns: true, trim: true }))
       .on('data', (row) => {
-        // Check for empty strings and required fields
         const requiredFields = ['name', 'day', 'timeRange', 'room', 'department', 'tag'];
         for (const field of requiredFields) {
           if (!row[field] || typeof row[field] !== 'string' || row[field].trim() === '') {
@@ -247,13 +270,11 @@ export const importSchedulesCSV = [
             return;
           }
         }
-        // Validate day
         if (!validDays.includes(row.day.trim())) {
           errors.push({ status: 'error', row, message: `Invalid day: ${row.day}` });
           hasError = true;
           return;
         }
-        // Validate time format
         if (!timeRegex.test(row.timeRange.trim())) {
           errors.push({ status: 'error', row, message: `Invalid time format: ${row.timeRange}` });
           hasError = true;
@@ -278,7 +299,7 @@ export const importSchedulesCSV = [
         });
       })
       .on('end', async () => {
-        fs.unlinkSync(req.file.path); // Clean up uploaded file
+        fs.unlinkSync(req.file.path);
         if (hasError) {
           return res.status(400).json({ message: 'CSV import failed. One or more rows are invalid.', errors });
         }

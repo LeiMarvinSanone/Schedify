@@ -67,7 +67,7 @@ export const register = async (req, res) => {
 // Login user — role is determined by backend, not frontend
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, expoPushToken } = req.body;
 
     // Find user by email
     const user = await User.findOne({ email });
@@ -76,6 +76,12 @@ export const login = async (req, res) => {
     // Check password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
+
+    // Save expoPushToken if provided
+    if (expoPushToken) {
+      user.expoPushToken = expoPushToken;
+      await user.save();
+    }
 
     // Role is taken from database, not from request
     const token = jwt.sign(
@@ -109,7 +115,6 @@ export const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
-    // Validate input
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ message: "Current password and new password are required" });
     }
@@ -118,22 +123,17 @@ export const changePassword = async (req, res) => {
       return res.status(400).json({ message: "New password must be at least 6 characters" });
     }
 
-    // Get user from database
     const user = await User.findById(req.user.id);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Verify current password
     const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: "Current password is incorrect" });
     }
 
-    // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    // Update password
     user.password = hashedPassword;
     await user.save();
 
@@ -147,7 +147,6 @@ export const changePassword = async (req, res) => {
 // Get current user data
 export const getMe = async (req, res) => {
   try {
-    // Get user from database (req.user.id set by verifyToken middleware)
     const user = await User.findById(req.user.id).select('-password');
     
     if (!user) {
