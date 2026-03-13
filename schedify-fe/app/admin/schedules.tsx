@@ -95,8 +95,12 @@ interface ScheduleItem {
   date?: string;
   time?: string;
   room?: string;
+  building?: string;
   organization?: string;
   description?: string;
+  course?: string;
+  block?: string;
+  yearLevel?: string;
 }
 
 const DATA: Record<PostType, { label: string; color: string; textColor: string; items: ScheduleItem[] }> = {
@@ -207,6 +211,7 @@ function AccordionSection({ type, items, onDelete, onEdit }: { type: PostType; i
                   <View style={acc.itemMeta}>
                     {item.time         && <Text style={[acc.metaChip, { color: metaColor }]}>{ICONS.meta.time} {item.time}</Text>}
                     {item.room         && <Text style={[acc.metaChip, { color: metaColor }]}>{ICONS.meta.room} {item.room}</Text>}
+                    {item.building     && <Text style={[acc.metaChip, { color: metaColor, fontWeight: 'bold' }]}>{ICONS.meta.building} {item.building}</Text>}
                     {item.organization && <Text style={[acc.metaChip, { color: metaColor }]}>{ICONS.meta.organization} {item.organization}</Text>}
                   </View>
                   <View style={[acc.tagBadge, { backgroundColor: color + '22' }]}>
@@ -305,7 +310,17 @@ export default function SchedulesScreen() {
     suspension: [],
   });
   const [editingItem, setEditingItem] = useState<ScheduleItem | null>(null);
-  const [editForm, setEditForm] = useState({ title: '', time: '', room: '', description: '', tag: '' });
+  const [editForm, setEditForm] = useState({
+    title: '',
+    time: '',
+    room: '',
+    description: '',
+    tag: '',
+    department: '',
+    course: '',
+    block: '',
+    yearLevel: '',
+  });
 
   const loadPostedEvents = async () => {
     try {
@@ -330,16 +345,27 @@ export default function SchedulesScreen() {
             ? subject.day.split('-').slice(1).join('-').replace('-', ' ').replace(/^0/, '')
             : subject.day || undefined;
 
+          let tagValue = '';
+          if (postType === 'class') {
+            const parts = [schedule.department, schedule.course, schedule.yearLevel, schedule.block].filter(Boolean);
+            if (schedule.tag === 'whole-university') {
+              parts.push('Whole University');
+            }
+            tagValue = parts.join(' - ') || 'Class';
+          } else {
+            tagValue = schedule.tag || schedule.department || 'Posted';
+          }
           const item: ScheduleItem = {
             id: `${schedule._id}-${subjectIndex}`,
             scheduleId: schedule._id,
             subjectIndex,
             scheduleType: schedule.type,
             title: subject.name,
-            tag: schedule.tag || schedule.course || schedule.department || 'Posted',
+            tag: tagValue,
             date: formattedDate,
             time: subject.timeRange,
             room: subject.room,
+            building: subject.building,
             organization: schedule.department,
             description: schedule.semester || schedule.yearLevel,
           };
@@ -380,6 +406,10 @@ export default function SchedulesScreen() {
       room: item.room || '',
       description: item.description || '',
       tag: item.tag || '',
+      department: item.organization || '',
+      course: item.course || '',
+      block: item.block || '',
+      yearLevel: item.yearLevel || '',
     });
   };
 
@@ -462,17 +492,28 @@ export default function SchedulesScreen() {
 
           <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Tag (Department/Group)</Text>
           <Dropdown
-            value={editForm.tag}
-            options={[
-              ...DEPARTMENTS,
-              ...COURSES.CICT.map(c => `${c}`),
-              ...COURSES.CBME.map(c => `${c}`),
-              ...BLOCKS,
-              ...COURSES.CICT.map(c => BLOCKS.map(b => `${c} ${b}`)).flat(),
-              ...COURSES.CBME.map(c => BLOCKS.map(b => `${c} ${b}`)).flat(),
-            ]}
-            onSelect={val => setEditForm(prev => ({ ...prev, tag: val }))}
-            placeholder="Select department, course, or block"
+            value={editForm.department || ''}
+            options={DEPARTMENTS}
+            onSelect={val => setEditForm(prev => ({ ...prev, department: val, course: '', block: '', yearLevel: '' }))}
+            placeholder="Select department"
+          />
+          <Dropdown
+            value={editForm.course || ''}
+            options={editForm.department ? COURSES[editForm.department] : []}
+            onSelect={val => setEditForm(prev => ({ ...prev, course: val }))}
+            placeholder="Select course"
+          />
+          <Dropdown
+            value={editForm.block || ''}
+            options={BLOCKS}
+            onSelect={val => setEditForm(prev => ({ ...prev, block: val }))}
+            placeholder="Select block"
+          />
+          <Dropdown
+            value={editForm.yearLevel || ''}
+            options={["1st Year", "2nd Year", "3rd Year", "4th Year"]}
+            onSelect={val => setEditForm(prev => ({ ...prev, yearLevel: val }))}
+            placeholder="Select year level"
           />
 
           <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Time</Text>

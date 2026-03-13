@@ -91,6 +91,7 @@ function normalizeToDateKey(value: string): string {
 }
 
 function recurringDateKeysForDay(value: string, weeksAhead = 16): string[] {
+  // Map a day (e.g., "Monday") to all matching days for the next 52 weeks (full year)
   const isoDate = parseIsoLikeDate(value);
   if (isoDate) return [isoDate];
 
@@ -106,7 +107,8 @@ function recurringDateKeysForDay(value: string, weeksAhead = 16): string[] {
   first.setDate(today.getDate() + diff);
 
   const keys: string[] = [];
-  for (let i = 0; i < weeksAhead; i += 1) {
+  const recurrenceWeeks = 52; // Show recurring schedules for a full year
+  for (let i = 0; i < recurrenceWeeks; i += 1) {
     const next = new Date(first);
     next.setDate(first.getDate() + i * 7);
     keys.push(toIsoDate(next));
@@ -142,6 +144,7 @@ function transformBackendSchedules(schedules: Awaited<ReturnType<typeof getSched
           type: eventType,
           time: subject.timeRange,
           room: subject.room,
+          building: subject.building,
           department: schedule.department,
           tag: schedule.tag,
           description: schedule.course,
@@ -263,7 +266,11 @@ function SearchDropdown({ results, isDark, onSelect, onClose }: {
                     <View style={sr.metaRow}>
                       {r.event.time && <Text style={[sr.meta, { color: isDark ? '#64748b' : '#94a3b8' }]}>{ICONS.meta.time} {r.event.time}</Text>}
                       {r.event.room && <Text style={[sr.meta, { color: isDark ? '#64748b' : '#94a3b8' }]}>{ICONS.meta.room} {r.event.room}</Text>}
-                      {r.event.building && <Text style={[sr.meta, { color: isDark ? '#64748b' : '#94a3b8' }]}>{ICONS.meta.building} {r.event.building}</Text>}
+                      {r.event.building && (
+                        <Text style={[sr.meta, { color: isDark ? '#94a3b8' : '#475569', fontWeight: 'bold', fontSize: 12 }]}>
+                          {ICONS.meta.building} {r.event.building}
+                        </Text>
+                      )}
                       {(r.event.department || r.event.org) && <Text style={[sr.meta, { color: isDark ? '#64748b' : '#94a3b8' }]}>{ICONS.meta.organization} {r.event.department || r.event.org}</Text>}
                       {r.event.tag && <Text style={[sr.meta, { color: isDark ? '#64748b' : '#94a3b8' }]}>🏷 {r.event.tag}</Text>}
                     </View>
@@ -389,7 +396,11 @@ function EventDetailPanel({ selectedDate, focusedIndex, events, year, month, onC
                       <View style={ep.infoLine}>
                         {ev.time && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>{ICONS.meta.time} {ev.time}</Text>}
                         {ev.room && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>{ICONS.meta.room} {ev.room}</Text>}
-                        {ev.building && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>{ICONS.meta.building} {ev.building}</Text>}
+                        {ev.building && (
+                            <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569', fontWeight: 'bold', fontSize: 12 }]}> 
+                            {ICONS.meta.building} {ev.building}
+                          </Text>
+                        )}
                         {(ev.department || ev.org) && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>{ICONS.meta.organization} {ev.department || ev.org}</Text>}
                         {ev.tag && <Text style={[ep.infoChip, { color: isDark ? '#94a3b8' : '#475569' }]}>🏷 {ev.tag}</Text>}
                       </View>
@@ -406,7 +417,7 @@ function EventDetailPanel({ selectedDate, focusedIndex, events, year, month, onC
   );
 }
 const ep = StyleSheet.create({
-  wrapper: { borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 12, paddingTop: 5, paddingBottom: 8, height: 168, borderTopWidth: 2, shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.35, shadowRadius: 8, elevation: 14 },
+  wrapper: { borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 12, paddingTop: 5, paddingBottom: 8, height: 210, borderTopWidth: 2, shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.35, shadowRadius: 8, elevation: 14 },
   glowStrip: { position: 'absolute', top: 0, left: 0, right: 0, height: 28, borderTopLeftRadius: 18, borderTopRightRadius: 18 },
   handle: { width: 36, height: 3, borderRadius: 2, alignSelf: 'center', marginBottom: 7 },
   inner: { flex: 1 },

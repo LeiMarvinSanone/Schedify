@@ -10,7 +10,6 @@ import { login as apiLogin } from '../../utils/apiClient';
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
-  const [role, setRole] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -24,10 +23,6 @@ const Login = () => {
     const newErrors: Record<string, string> = {};
     if (!formData.email) newErrors.email = 'Email is required';
     if (!formData.password) newErrors.password = 'Password is required';
-    if (!role) {
-      Alert.alert('Select Role', 'Please select your role.');
-      return;
-    }
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -35,13 +30,9 @@ const Login = () => {
 
     try {
       setIsLoading(true);
-      await apiLogin(formData.email, formData.password, role);
+      await apiLogin(formData.email, formData.password);
 
-      if (role === 'admin') {
-        router.replace('/admin/dashboard' as any);
-      } else {
-        router.replace('/student/calendar' as any);
-      }
+      router.replace('/student/calendar' as any);
     } catch {
       Alert.alert('Error', 'Login failed. Invalid email or password.');
     } finally {
@@ -98,23 +89,6 @@ const Login = () => {
           </TouchableOpacity>
         </View>
         {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
-      </View>
-
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Role</Text>
-        <View style={styles.pickerWrapper}>
-          <Picker
-            selectedValue={role}
-            onValueChange={(val) => setRole(val)}
-            style={styles.picker}
-            dropdownIconColor="#a0aec0"
-          >
-            <Picker.Item label="Select role..." value="" color="#999" />
-            <Picker.Item label="Student" value="student" color="#333" />
-            <Picker.Item label="Professor" value="professor" color="#333" />
-          </Picker>
-        </View>
       </View>
 
       <TouchableOpacity style={styles.button} disabled={isLoading} onPress={handleSubmit} activeOpacity={0.8}>

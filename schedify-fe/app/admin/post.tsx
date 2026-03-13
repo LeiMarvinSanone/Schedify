@@ -1,9 +1,90 @@
 import React, { useState } from 'react';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, StatusBar, Modal, Alert, Keyboard } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import { ICONS } from '../../constants/icons';
 import { useTheme } from '../../ThemeContext';
 import BottomNav from '../../components/BottomNav';
-import { createSchedule } from '../../utils/apiClient';
+import { createSchedule, importSchedulesBulk } from '../../utils/apiClient';
+export {}; // Ensures this file is a module
+declare global {
+  var schedifyCsvImported: boolean | undefined;
+}
+
+function parseSubjectsFromCSV(raw: string): Subject[] {
+  const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (lines.length < 2) throw new Error('CSV must have a header row and at least one data row.');
+
+  // Normalize header (remove spaces, lower case)
+  const headers = lines[0].split(',').map(h => h.replace(/\s+/g, '').toLowerCase());
+  const col = (name: string, alt?: string) => {
+    const idx = headers.indexOf(name);
+    if (idx !== -1) return idx;
+    if (alt) {
+      const altIdx = headers.indexOf(alt);
+      if (altIdx !== -1) return altIdx;
+    }
+    return -1;
+  };
+
+  const iName      = col('name');
+  const iDay       = col('day');
+  const iTime      = col('time', 'timerange');
+  const iRoom      = col('room');
+  const iBldg      = col('building');
+  const iProf      = col('professor');
+  const iDept      = col('department');
+  const iCourse    = col('course');
+  const iYearLevel = col('yearlevel');
+  const iBlock     = col('block');
+  // tag column is optional
+  const iTag       = col('tag');
+
+  if (iName === -1 || iDay === -1 || iTime === -1 || iRoom === -1) {
+    throw new Error('CSV header must include: name, day, time/timeRange, room');
+  }
+
+  return lines.slice(1).map((line, i) => {
+    const cols = line.match(/(".*?"|[^,]+|(?<=,)(?=,)|(?<=,)$|^(?=,))/g) ?? line.split(',');
+    const get = (idx: number) => (idx !== -1 ? (cols[idx] ?? '').replace(/^"|"$/g, '').trim() : '');
+
+    // Validate required fields
+    if (!get(iName) || !get(iDay) || !get(iTime) || !get(iRoom)) {
+      throw new Error(`Row ${i + 1} is missing required fields.`);
+    }
+    // Validate time format (24-hour or 12-hour AM/PM)
+    const timeRegex = /^(\d{1,2}:\d{2}(?:\s*[APap][Mm])?)(\s*-\s*\d{1,2}:\d{2}(?:\s*[APap][Mm])?)?$/;
+    if (!timeRegex.test(get(iTime))) {
+      throw new Error(`Row ${i + 1} has invalid time format: ${get(iTime)}. Use HH:MM or HH:MM AM/PM or HH:MM - HH:MM AM/PM.`);
+    }
+
+    // Auto-generate tag if not present
+    let tag = get(iTag);
+    // If professor is present, include in tag for professor-only targeting
+    if (!tag && (iCourse !== -1 || iYearLevel !== -1 || iBlock !== -1 || iProf !== -1)) {
+      tag = [get(iCourse), get(iYearLevel), get(iBlock), get(iProf)].filter(Boolean).join(' ');
+    }
+
+    const rawDay = get(iDay);
+    const matchedDay = DAYS.find(d => d.toLowerCase().startsWith(rawDay.toLowerCase().slice(0, 3))) ?? 'Monday';
+
+    return {
+      id: `csv-${Date.now()}-${i}`,
+      name:      get(iName),
+      day:       matchedDay,
+      time:      get(iTime),
+      room:      get(iRoom),
+      building:  get(iBldg),
+      professor: get(iProf),
+      department: get(iDept),
+      course:    get(iCourse),
+      yearLevel: get(iYearLevel),
+      block:     get(iBlock),
+      tag,
+    };
+  }).filter(s => s.name.length > 0);
+}
 
 type PostType = 'class' | 'event' | 'suspension';
 
@@ -15,6 +96,14 @@ type Subject = {
   room: string;
   building: string;
   professor: string;
+  department: string;
+  course: string;
+  yearLevel: string;
+  block: string;
+  tag: string;
+    timeType?: 'dropdown' | 'other';
+    buildingType?: 'dropdown' | 'other';
+    roomType?: 'dropdown' | 'other';
 };
 
 const DEPARTMENTS = ['CICT', 'CBME'];
@@ -133,16 +222,105 @@ function ClassScheduleForm() {
   const [block, setBlock]       = useState('');
   const [semester, setSemester] = useState('');
   const [subjects, setSubjects] = useState<Subject[]>([
-    { id: String(Date.now()), name: '', day: 'Monday', time: '', room: '', building: '', professor: '' },
+    {
+      id: String(Date.now()),
+      name: '',
+      day: 'Monday',
+      time: '',
+      room: '',
+      building: '',
+      professor: '',
+      department: '',
+      course: '',
+      yearLevel: '',
+      block: '',
+      tag: '',
+    },
   ]);
 
   const audienceTag = [course, year, block].filter(Boolean).join(' ');
+
+  // CSV Import handler
+  const handleImportCSV = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['text/csv', 'text/comma-separated-values', 'text/plain'],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets?.length) return;
+
+      const { uri, name } = result.assets[0];
+
+      // Use new FileSystem API for file reading (Expo SDK v54+)
+      const { File } = FileSystem;
+      const file = new File(uri);
+      const raw = await file.text();
+      const imported = parseSubjectsFromCSV(raw);
+
+      if (imported.length === 0) {
+        Alert.alert('No subjects found', 'The CSV file had no valid subject rows. Make sure it includes a "name" column.');
+        return;
+      }
+
+      // Prepare for backend bulk import
+      const schedulesPayload = imported.map(subj => ({
+        name: subj.name,
+        day: subj.day,
+        timeRange: subj.time,
+        room: subj.room,
+        department: dept,
+        tag: audienceTag || 'whole-university',
+      }));
+
+      try {
+        const resp = await importSchedulesBulk(schedulesPayload);
+        let importMessage = 'CSV import completed.';
+        if (resp && resp.message) {
+          importMessage = resp.message;
+        }
+        if (resp && resp.results) {
+          const successCount = resp.results.filter((r: any) => r.status === 'success').length;
+          const errorCount = resp.results.filter((r: any) => r.status === 'error').length;
+          setPostStatus(`Imported: ${successCount} succeeded, ${errorCount} failed.`);
+          importMessage += `\nImported: ${successCount} succeeded, ${errorCount} failed.`;
+        }
+        // Always show confirmation alert
+        Alert.alert('Import Result', importMessage);
+        // Set global flag for schedules refresh in React Native
+        if (typeof global !== 'undefined') {
+          global.schedifyCsvImported = true;
+        }
+      } catch (err: any) {
+        Alert.alert('Backend Import Failed', err?.message || 'Could not import schedules.');
+      }
+    } catch (err: any) {
+      Alert.alert('Import failed', err.message ?? 'Could not read the CSV file. Please check the format.');
+      console.error('CSV import error:', err);
+    }
+  };
 
   const updateSubject = (id: string, field: keyof Subject, value: string) => {
     setSubjects(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
   };
   const addSubject = () => {
-    setSubjects(prev => [...prev, { id: String(Date.now()), name: '', day: 'Monday', time: '', room: '', building: '', professor: '' }]);
+    setSubjects(prev => [
+      ...prev,
+      {
+        id: String(Date.now()),
+        name: '',
+        day: 'Monday',
+        time: '',
+        room: '',
+        building: '',
+        professor: '',
+        department: '',
+        course: '',
+        yearLevel: '',
+        block: '',
+        tag: '',
+      },
+    ]);
   };
   const removeSubject = (id: string) => {
     setSubjects(prev => prev.filter(s => s.id !== id));
@@ -160,6 +338,7 @@ function ClassScheduleForm() {
         return;
       }
 
+      const timeRegex = /^(\d{1,2}:\d{2}(?:\s*[APap][Mm])?)(\s*-\s*\d{1,2}:\d{2}(?:\s*[APap][Mm])?)?$/;
       const validSubjects = subjects
         .map((s) => ({
           name: s.name.trim(),
@@ -173,6 +352,16 @@ function ClassScheduleForm() {
         Alert.alert('Missing subject name', 'Please provide at least one subject name before posting.');
         setPostStatus('Please provide at least one subject name.');
         return;
+      }
+
+      // Validate time format for all subjects
+      for (const subj of validSubjects) {
+        if (!timeRegex.test(subj.timeRange)) {
+          Alert.alert('Invalid time format', `Subject '${subj.name}' has invalid time: '${subj.timeRange}'. Use HH:MM or HH:MM - HH:MM.`);
+          setPostStatus('Invalid time format.');
+          setIsPosting(false);
+          return;
+        }
       }
 
       await createSchedule({
@@ -190,7 +379,22 @@ function ClassScheduleForm() {
       setPostStatus(`Posted ${validSubjects.length} subject${validSubjects.length > 1 ? 's' : ''}.`);
       
       // Reset form
-      setSubjects([{ id: '1', name: '', day: 'Monday', time: '', room: '', building: '', professor: '' }]);
+      setSubjects([
+        {
+          id: '1',
+          name: '',
+          day: 'Monday',
+          time: '',
+          room: '',
+          building: '',
+          professor: '',
+          department: '',
+          course: '',
+          yearLevel: '',
+          block: '',
+          tag: '',
+        },
+      ]);
       setDept('');
       setCourse('');
       setYear('');
@@ -220,6 +424,33 @@ function ClassScheduleForm() {
 
   return (
     <>
+      {/* Large Import CSV button at the top */}
+      <View style={{ alignItems: 'center', marginBottom: 24 }}>
+        <TouchableOpacity
+          style={{
+            width: '90%',
+            backgroundColor: isDark ? '#1a3a5c' : '#dbeafe',
+            borderColor: isDark ? '#2d6ea8' : '#93c5fd',
+            borderWidth: 2,
+            borderRadius: 16,
+            paddingVertical: 18,
+            marginTop: 8,
+            marginBottom: 8,
+            elevation: 2,
+          }}
+          onPress={handleImportCSV}
+        >
+          <Text style={{
+            color: isDark ? '#60a5fa' : '#1d4ed8',
+            fontSize: 18,
+            fontWeight: 'bold',
+            textAlign: 'center',
+            letterSpacing: 0.5,
+          }}>Import CSV (Class Subjects)</Text>
+        </TouchableOpacity>
+        
+      </View>
+
       <View style={styles.row2}>
         <View style={styles.col}>
           <Text style={[styles.label, { color: theme.muted }]}>DEPARTMENT</Text>
@@ -249,7 +480,7 @@ function ClassScheduleForm() {
           <Dropdown value={block} options={BLOCKS} placeholder="Select block" onSelect={setBlock} />
         </View>
       </View>
-      <Text style={[styles.targetingHint, { color: theme.muted }]}>Leave Year Level and Block empty to target all year levels and sections in the selected course.</Text>
+
 
       <Text style={[styles.label, { color: theme.muted }]}>SEMESTER</Text>
       <Dropdown value={semester} options={SEMESTERS} placeholder="Select semester" onSelect={setSemester} />
@@ -262,13 +493,16 @@ function ClassScheduleForm() {
 
       <View style={styles.subjectsHeader}>
         <Text style={[styles.label, { color: theme.muted }]}>SUBJECTS & SCHEDULES</Text>
-        <TouchableOpacity style={[styles.addBtn, { backgroundColor: addBtnBg, borderColor: addBtnBorder }]} onPress={addSubject}>
-          <Text style={[styles.addBtnText, { color: addBtnText }]}>{ICONS.actions.add} Add Subject</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity style={[styles.addBtn, { backgroundColor: addBtnBg, borderColor: addBtnBorder }]} onPress={addSubject}>
+            <Text style={[styles.addBtnText, { color: addBtnText }]}>{ICONS.actions.add} Add Subject</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {subjects.map((subj, index) => (
-        <View key={subj.id} style={[styles.subjectCard, { backgroundColor: subjectCardBg, borderColor: subjectCardBorder }]}>
+        <View key={subj.id} style={[styles.subjectCard, { backgroundColor: subjectCardBg, borderColor: subjectCardBorder }]}> 
+          {/* Track if 'Other' is selected for building - initialization logic should be handled in addSubject or CSV import, not in render */}
           <View style={styles.subjectCardHeader}>
             <Text style={[styles.subjectLabel, { color: subjectLabelColor }]}>Subject {index + 1}</Text>
             {subjects.length > 1 && (
@@ -291,31 +525,104 @@ function ClassScheduleForm() {
             <View style={{ flex: 1 }}>
               <Dropdown value={subj.day.slice(0, 4)} options={DAYS.map(d => d.slice(0, 4))} onSelect={v => updateSubject(subj.id, 'day', v)} />
             </View>
-            <View style={{ flex: 1 }}>
-              <TextInput
-                style={[styles.roomInput, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text }]}
-                value={subj.time} onChangeText={v => updateSubject(subj.id, 'time', v)}
-                placeholder="Time range" placeholderTextColor={theme.muted}
-              />
-            </View>
           </View>
 
           <View style={styles.subjectRow}>
             <View style={{ flex: 1 }}>
-              <TextInput
-                style={[styles.roomInput, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text }]}
-                value={subj.room} onChangeText={v => updateSubject(subj.id, 'room', v)}
-                placeholder="Room" placeholderTextColor={theme.muted}
+              <Dropdown
+                value={subj.timeType === 'dropdown' ? subj.time : (subj.timeType === 'other' ? 'Other' : '')}
+                options={[
+                  '7:00 AM - 8:00 AM',
+                  '8:00 AM - 10:00 AM',
+                  '10:00 AM - 12:00 PM',
+                  '1:00 PM - 3:00 PM',
+                  '3:00 PM - 5:00 PM',
+                  'Other'
+                ]}
+                onSelect={v => {
+                  if (v === 'Other') {
+                    updateSubject(subj.id, 'timeType', 'other');
+                    updateSubject(subj.id, 'time', '');
+                  } else {
+                    updateSubject(subj.id, 'timeType', 'dropdown');
+                    updateSubject(subj.id, 'time', v);
+                  }
+                }}
+                placeholder="Select time range"
               />
+              {subj.timeType === 'other' && (
+                <TextInput
+                  style={[styles.roomInput, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text, marginTop: 6 }]}
+                  value={subj.time}
+                  onChangeText={v => updateSubject(subj.id, 'time', v)}
+                  placeholder="Type time range manually"
+                  placeholderTextColor={theme.muted}
+                  autoCorrect={false}
+                  autoCapitalize="words"
+                />
+              )}
             </View>
             <View style={{ flex: 1 }}>
-              <TextInput
-                style={[styles.roomInput, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text }]}
-                value={subj.building}
-                onChangeText={v => updateSubject(subj.id, 'building', v)}
-                placeholder="Building"
-                placeholderTextColor={theme.muted}
+              <Dropdown
+                value={subj.roomType === 'dropdown' ? subj.room : (subj.roomType === 'other' ? 'Other' : '')}
+                options={[
+                  'Room 1', 'Room 2', 'Room 3', 'Room 4', 'Room 5', 'Room 6', 'Room 7', 'Room 8', 'Room 9', 'Room 10', 'Room 11',
+                  'CCB laboratory A', 'CCB laboratory B', 'CCB laboratory C', 'CCB laboratory D',
+                  'Other'
+                ]}
+                onSelect={v => {
+                  if (v === 'Other') {
+                    updateSubject(subj.id, 'roomType', 'other');
+                    updateSubject(subj.id, 'room', '');
+                  } else {
+                    updateSubject(subj.id, 'roomType', 'dropdown');
+                    updateSubject(subj.id, 'room', v);
+                  }
+                }}
+                placeholder="Select room"
               />
+              {subj.roomType === 'other' && (
+                <TextInput
+                  style={[styles.roomInput, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text, marginTop: 6 }]}
+                  value={subj.room}
+                  onChangeText={v => updateSubject(subj.id, 'room', v)}
+                  placeholder="Type room manually"
+                  placeholderTextColor={theme.muted}
+                  autoCorrect={false}
+                  autoCapitalize="words"
+                />
+              )}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Dropdown
+                value={subj.buildingType === 'dropdown' ? subj.building : (subj.buildingType === 'other' ? 'Other' : '')}
+                options={[
+                  "ICT", "CCB", "CCB LABORATORY", "BME", "BTTE",
+                  "SOCIAL HALL", "GRANDTAND", "MANGGAHAN", "FIELD",
+                  "Other"
+                ]}
+                onSelect={v => {
+                  if (v === 'Other') {
+                    updateSubject(subj.id, 'buildingType', 'other');
+                    updateSubject(subj.id, 'building', '');
+                  } else {
+                    updateSubject(subj.id, 'buildingType', 'dropdown');
+                    updateSubject(subj.id, 'building', v);
+                  }
+                }}
+                placeholder="Select building"
+              />
+              {subj.buildingType === 'other' && (
+                <TextInput
+                  style={[styles.roomInput, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text, marginTop: 6 }]}
+                  value={subj.building}
+                  onChangeText={v => updateSubject(subj.id, 'building', v)}
+                  placeholder="Type building manually"
+                  placeholderTextColor={theme.muted}
+                  autoCorrect={false}
+                  autoCapitalize="words"
+                />
+              )}
             </View>
           </View>
         </View>
@@ -352,6 +659,9 @@ function EventSuspensionForm({ type }: { type: 'event' | 'suspension' }) {
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime]     = useState('');
   const [tag, setTag]             = useState('');
+  const [startTimeType, setStartTimeType] = useState<'dropdown' | 'other'>('dropdown');
+  const [endTimeType, setEndTimeType] = useState<'dropdown' | 'other'>('dropdown');
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const accentColor = type === 'event' ? '#3b82f6' : '#fc8181';
   const accentBg    = type === 'event'
@@ -377,9 +687,26 @@ function EventSuspensionForm({ type }: { type: 'event' | 'suspension' }) {
       return;
     }
 
-    const composedTime = type === 'event'
-      ? [startTime.trim(), endTime.trim()].filter(Boolean).join(' - ')
-      : startTime.trim();
+    // Validate time format
+    const timeRegex = /^(\d{1,2}:\d{2}(?:\s*[APap][Mm])?)(\s*-\s*\d{1,2}:\d{2}(?:\s*[APap][Mm])?)?$/;
+    let composedTime = '';
+    if (type === 'event') {
+      composedTime = [startTime.trim(), endTime.trim()].filter(Boolean).join(' - ');
+      if (startTime.trim() && !timeRegex.test(startTime.trim())) {
+        Alert.alert('Invalid time format', `Start time '${startTime.trim()}' is invalid. Use HH:MM or HH:MM - HH:MM.`);
+        return;
+      }
+      if (endTime.trim() && !timeRegex.test(endTime.trim())) {
+        Alert.alert('Invalid time format', `End time '${endTime.trim()}' is invalid. Use HH:MM or HH:MM - HH:MM.`);
+        return;
+      }
+    } else {
+      composedTime = startTime.trim();
+      if (composedTime && !timeRegex.test(composedTime)) {
+        Alert.alert('Invalid time format', `Suspension time '${composedTime}' is invalid. Use HH:MM or HH:MM - HH:MM.`);
+        return;
+      }
+    }
 
     try {
       await createSchedule({
@@ -439,33 +766,125 @@ function EventSuspensionForm({ type }: { type: 'event' | 'suspension' }) {
           </View>
           <View style={styles.col}>
             <Text style={[styles.label, { color: theme.muted }]}>BUILDING</Text>
-            <TextInput style={[styles.input, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text }]}
-              value={building} onChangeText={setBuilding} placeholder="Enter location" placeholderTextColor={theme.muted} />
+            <Dropdown
+              value={building}
+              options={["SOCIAL HALL", "GRANDTAND", "MANGGAHAN", "FIELD", "Other"]}
+              onSelect={v => {
+                if (v === 'Other') {
+                  setBuilding('');
+                } else {
+                  setBuilding(v);
+                }
+              }}
+              placeholder="Select building"
+            />
+            {building === '' && (
+              <TextInput
+                style={[styles.input, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text, marginTop: 6 }]}
+                value={building}
+                onChangeText={setBuilding}
+                placeholder="Type building manually"
+                placeholderTextColor={theme.muted}
+                autoCorrect={false}
+                autoCapitalize="words"
+              />
+            )}
           </View>
         </View>
       )}
 
       <Text style={[styles.label, { color: theme.muted }]}>DATE</Text>
-      <TextInput
-        style={[styles.input, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text }]}
-        value={date} onChangeText={setDate}
-        placeholder="YYYY-MM-DD" placeholderTextColor={theme.muted} keyboardType="numeric"
-      />
+      <TouchableOpacity
+        style={[styles.input, { backgroundColor: theme.input, borderColor: theme.divider }]} // removed color from View style
+        onPress={() => setShowDatePicker(true)}
+      >
+        <Text style={{ color: date ? theme.text : theme.muted }}>
+          {date ? date : 'Select date'}
+        </Text>
+      </TouchableOpacity>
+      {showDatePicker && (
+        <DateTimePicker
+          value={date ? new Date(date) : new Date()}
+          mode="date"
+          display="calendar"
+          onChange={(event, selectedDate) => {
+            setShowDatePicker(false);
+            if (selectedDate) {
+              const yyyy = selectedDate.getFullYear();
+              const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
+              const dd = String(selectedDate.getDate()).padStart(2, '0');
+              setDate(`${yyyy}-${mm}-${dd}`);
+            }
+          }}
+        />
+      )}
 
-      <View style={styles.row2}>
-        <View style={styles.col}>
-          <Text style={[styles.label, { color: theme.muted }]}>START TIME</Text>
-          <TextInput style={[styles.input, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text }]}
-            value={startTime} onChangeText={setStartTime} placeholder="Start time" placeholderTextColor={theme.muted} />
-        </View>
-        {type === 'event' && (
+      {type === 'event' && (
+        <View style={styles.row2}>
+          <View style={styles.col}>
+            <Text style={[styles.label, { color: theme.muted }]}>START TIME</Text>
+            <Dropdown
+              value={startTimeType === 'dropdown' ? startTime : (startTimeType === 'other' ? 'Other' : '')}
+              options={[
+                '7:00 AM', '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
+                '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', 'Other'
+              ]}
+              onSelect={v => {
+                if (v === 'Other') {
+                  setStartTimeType('other');
+                  setStartTime('');
+                } else {
+                  setStartTimeType('dropdown');
+                  setStartTime(v);
+                }
+              }}
+              placeholder="Select start time"
+            />
+            {startTimeType === 'other' && (
+              <TextInput
+                style={[styles.input, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text, marginTop: 6 }]}
+                value={startTime}
+                onChangeText={setStartTime}
+                placeholder="Type start time manually"
+                placeholderTextColor={theme.muted}
+                autoCorrect={false}
+                autoCapitalize="words"
+              />
+            )}
+          </View>
           <View style={styles.col}>
             <Text style={[styles.label, { color: theme.muted }]}>END TIME</Text>
-            <TextInput style={[styles.input, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text }]}
-              value={endTime} onChangeText={setEndTime} placeholder="End time" placeholderTextColor={theme.muted} />
+            <Dropdown
+              value={endTimeType === 'dropdown' ? endTime : (endTimeType === 'other' ? 'Other' : '')}
+              options={[
+                '7:00 AM', '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
+                '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', 'Other'
+              ]}
+              onSelect={v => {
+                if (v === 'Other') {
+                  setEndTimeType('other');
+                  setEndTime('');
+                } else {
+                  setEndTimeType('dropdown');
+                  setEndTime(v);
+                }
+              }}
+              placeholder="Select end time"
+            />
+            {endTimeType === 'other' && (
+              <TextInput
+                style={[styles.input, { backgroundColor: theme.input, borderColor: theme.divider, color: theme.text, marginTop: 6 }]}
+                value={endTime}
+                onChangeText={setEndTime}
+                placeholder="Type end time manually"
+                placeholderTextColor={theme.muted}
+                autoCorrect={false}
+                autoCapitalize="words"
+              />
+            )}
           </View>
-        )}
-      </View>
+        </View>
+      )}
 
       <Text style={[styles.label, { color: theme.muted }]}>AUDIENCE TAG</Text>
       <Dropdown value={tag} options={tagOptions} onSelect={setTag} placeholder="Who sees this?" />
