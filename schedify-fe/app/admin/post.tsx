@@ -6,7 +6,7 @@ import * as FileSystem from 'expo-file-system';
 import { ICONS } from '../../constants/icons';
 import { useTheme } from '../../ThemeContext';
 import BottomNav from '../../components/BottomNav';
-import { createSchedule, importSchedulesBulk } from '../../utils/apiClient';
+import { createSchedule, importSchedulesBulk, getCurrentUser } from '../../utils/apiClient';
 export {}; // Ensures this file is a module
 declare global {
   var schedifyCsvImported: boolean | undefined;
@@ -101,6 +101,7 @@ type Subject = {
   yearLevel: string;
   block: string;
   tag: string;
+  semester?: string;
     timeType?: 'dropdown' | 'other';
     buildingType?: 'dropdown' | 'other';
     roomType?: 'dropdown' | 'other';
@@ -253,24 +254,28 @@ function ClassScheduleForm() {
       const { uri, name } = result.assets[0];
 
       // Use new FileSystem API for file reading (Expo SDK v54+)
+            // Fetch admin user ID
+            const user = await getCurrentUser();
+            const adminUserId = user?.id;
       const { File } = FileSystem;
       const file = new File(uri);
       const raw = await file.text();
       const imported = parseSubjectsFromCSV(raw);
-
-      if (imported.length === 0) {
-        Alert.alert('No subjects found', 'The CSV file had no valid subject rows. Make sure it includes a "name" column.');
-        return;
-      }
-
+      
       // Prepare for backend bulk import
       const schedulesPayload = imported.map(subj => ({
         name: subj.name,
         day: subj.day,
         timeRange: subj.time,
         room: subj.room,
-        department: dept,
-        tag: audienceTag || 'whole-university',
+        department: subj.department || dept,
+        course: subj.course,
+        yearLevel: subj.yearLevel,
+        block: subj.block,
+        semester: subj.semester,
+        tag: subj.tag || audienceTag || 'whole-university',
+        createdBy: adminUserId,
+        type: "Class Schedules",
       }));
 
       try {
