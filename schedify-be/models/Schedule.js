@@ -6,6 +6,7 @@ const subjectSchema = new mongoose.Schema({
   day: { type: String, required: true },         // e.g. "Monday"
   timeRange: { type: String, required: true },   // e.g. "8:00am - 10:00am"
   room: { type: String },                        // e.g. "Lab 1"
+  building: { type: String },                    // e.g. "Main Building"
 });
 
 const scheduleSchema = new mongoose.Schema({

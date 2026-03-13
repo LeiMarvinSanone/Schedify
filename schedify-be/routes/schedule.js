@@ -5,6 +5,8 @@ import {
   getScheduleById,
   updateSchedule,
   deleteSchedule,
+  importSchedules,
+  importSchedulesCSV,
 } from '../controllers/scheduleController.js';
 import { verifyToken, requireAdmin } from '../middleware/authmiddleware.js';
 
@@ -18,6 +20,10 @@ router.put('/:id', verifyToken, requireAdmin, updateSchedule);
 
 // Admin only — delete schedule
 router.delete('/:id', verifyToken, requireAdmin, deleteSchedule);
+
+// Admin only — import schedules in bulk (CSV/JSON)
+router.post('/import', verifyToken, requireAdmin, importSchedules);
+router.post('/import-csv', verifyToken, requireAdmin, importSchedulesCSV);
 
 // Authenticated users — get all schedules (filtered)
 router.get('/', verifyToken, getSchedules);
