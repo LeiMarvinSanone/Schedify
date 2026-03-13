@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const BASE_URL = 'https://schedify-be.onrender.com';
 const TOKEN_KEY = 'schedify:auth:token:v1';
 const USER_KEY = 'schedify:auth:user:v1';
+const LOGIN_TIME_KEY = 'schedify:auth:loginTime:v1';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -12,7 +13,6 @@ interface ApiResponse<T> {
 }
 
 function extractAuthData(response: ApiResponse<AuthResponse> | AuthResponse): AuthResponse {
-  // Support both API shapes: { data: { token, user } } and { token, user }
   const envelope = response as ApiResponse<AuthResponse>;
   if (envelope && typeof envelope === 'object' && envelope.data) {
     return envelope.data;
@@ -22,7 +22,17 @@ function extractAuthData(response: ApiResponse<AuthResponse> | AuthResponse): Au
 
 export async function getAuthToken(): Promise<string | null> {
   try {
-    return await AsyncStorage.getItem(TOKEN_KEY);
+    const token = await AsyncStorage.getItem(TOKEN_KEY);
+    const loginTimeRaw = await AsyncStorage.getItem(LOGIN_TIME_KEY);
+    if (!token || !loginTimeRaw) return null;
+    const loginTime = Number(loginTimeRaw);
+    const now = Date.now();
+    const fifteenDays = 15 * 24 * 60 * 60 * 1000;
+    if (now - loginTime > fifteenDays) {
+      await clearAuthToken();
+      return null;
+    }
+    return token;
   } catch {
     return null;
   }
@@ -30,11 +40,13 @@ export async function getAuthToken(): Promise<string | null> {
 
 export async function setAuthToken(token: string): Promise<void> {
   await AsyncStorage.setItem(TOKEN_KEY, token);
+  await AsyncStorage.setItem(LOGIN_TIME_KEY, String(Date.now()));
 }
 
 export async function clearAuthToken(): Promise<void> {
   await AsyncStorage.removeItem(TOKEN_KEY);
   await AsyncStorage.removeItem(USER_KEY);
+  await AsyncStorage.removeItem(LOGIN_TIME_KEY);
 }
 
 async function setStoredUser(user: AuthResponse['user']): Promise<void> {
@@ -159,12 +171,14 @@ export async function signup(signupData: SignupInput): Promise<AuthResponse> {
 export async function login(
   email: string,
   password: string,
-  role: string
+  role?: string
 ): Promise<AuthResponse> {
+  const payload: any = { email, password };
+  if (role) payload.role = role;
   const response = await apiCall<ApiResponse<AuthResponse> | AuthResponse>(
     '/api/auth/login',
     'POST',
-    { email, password, role }
+    payload
   );
 
   const authData = extractAuthData(response);
@@ -212,6 +226,7 @@ export interface ScheduleSubject {
   day: string;
   timeRange: string;
   room?: string;
+  building?: string;
 }
 
 export interface Schedule {
@@ -263,4 +278,22 @@ export async function updateSchedule(id: string, data: Partial<CreateScheduleInp
 
 export async function deleteSchedule(id: string): Promise<{ message: string }> {
   return await apiCall<{ message: string }>(`/api/schedules/${id}`, 'DELETE');  
+}
+
+export async function importSchedulesBulk(schedules: any[]): Promise<any> {
+  return await apiCall('/api/schedules/import', 'POST', { schedules });
+}
+
+export async function isSessionValid(): Promise<boolean> {
+  const token = await AsyncStorage.getItem(TOKEN_KEY);
+  const loginTimeRaw = await AsyncStorage.getItem(LOGIN_TIME_KEY);
+  if (!token || !loginTimeRaw) return false;
+  const loginTime = Number(loginTimeRaw);
+  const now = Date.now();
+  const fifteenDays = 15 * 24 * 60 * 60 * 1000;
+  if (now - loginTime > fifteenDays) {
+    await clearAuthToken();
+    return false;
+  }
+  return true;
 }
