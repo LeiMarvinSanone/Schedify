@@ -8,7 +8,7 @@ import { useTheme } from '../../ThemeContext';
 import { ICONS } from '../../constants/icons';
 import BottomNav from '../../components/BottomNav';
 import { useFocusEffect } from '@react-navigation/native';
-import { getSchedules } from '../../utils/apiClient';
+import { getSchedules, getCurrentUser } from '../../utils/apiClient';
 import {
   getClassReminderOverrides,
   getDefaultClassReminder,
@@ -294,15 +294,36 @@ export default function EventsScreen() {
   const [defaultReminder, setDefaultReminder] = useState<ReminderOption>('30m');
   const [reminderOverrides, setReminderOverrides] = useState<Record<string, ReminderOption>>({});
 
+  // Helper to normalize strings for robust comparison
+  function normalize(str?: string) {
+    return (str || '').trim().toLowerCase().replace(/\s+/g, '');
+  }
+
   const reloadEvents = useCallback(async () => {
     try {
-      const [schedules, currentDefault, currentOverrides] = await Promise.all([
+      const [schedules, currentDefault, currentOverrides, student] = await Promise.all([
         getSchedules(),
         getDefaultClassReminder(),
         getClassReminderOverrides(),
+        getCurrentUser(),
       ]);
 
-      setData(buildEventsData(schedules));
+      let filteredSchedules = schedules;
+      if (student) {
+        filteredSchedules = schedules.filter(schedule => {
+          return (
+            normalize(schedule.department) === normalize(student.department) &&
+            normalize(schedule.course) === normalize(student.course) &&
+            normalize(schedule.yearLevel) === normalize(student.yearLevel) &&
+            (
+              normalize(schedule.block) === normalize(student.block) ||
+              normalize(schedule.tag) === normalize(`${student.course} ${student.block}`)
+            )
+          );
+        });
+      }
+
+      setData(buildEventsData(filteredSchedules));
       setDefaultReminder(currentDefault);
       setReminderOverrides(currentOverrides);
       // Note: syncClassReminderNotifications needs backend schedules format

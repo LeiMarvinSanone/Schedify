@@ -8,7 +8,7 @@ import { useTheme } from '../../ThemeContext';
 import { ICONS } from '../../constants/icons';
 import BottomNav from '../../components/BottomNav';
 import { useFocusEffect } from '@react-navigation/native';
-import { getSchedules } from '../../utils/apiClient';
+import { getSchedules, getCurrentUser } from '../../utils/apiClient';
 
 const { width } = Dimensions.get('window');
 
@@ -781,10 +781,34 @@ export default function CalendarScreen() {
   const [focusedEventIndex, setFocusedEventIndex] = useState<number | null>(null);
   const [eventsByDate, setEventsByDate] = useState<Record<string, CalEvent[]>>(DEFAULT_EVENTS);
 
+
+  // Helper to normalize strings for robust comparison
+  function normalize(str?: string) {
+    return (str || '').trim().toLowerCase().replace(/\s+/g, '');
+  }
+
   const loadSchedules = useCallback(async (searchText?: string) => {
     try {
-      const schedules = await getSchedules(searchText);
-      setEventsByDate(transformBackendSchedules(schedules));
+      const [schedules, student] = await Promise.all([
+        getSchedules(searchText),
+        getCurrentUser(),
+      ]);
+      if (!student) {
+        setEventsByDate(DEFAULT_EVENTS);
+        return;
+      }
+      const filteredSchedules = schedules.filter(schedule => {
+        return (
+          normalize(schedule.department) === normalize(student.department) &&
+          normalize(schedule.course) === normalize(student.course) &&
+          normalize(schedule.yearLevel) === normalize(student.yearLevel) &&
+          (
+            normalize(schedule.block) === normalize(student.block) ||
+            normalize(schedule.tag) === normalize(`${student.course} ${student.block}`)
+          )
+        );
+      });
+      setEventsByDate(transformBackendSchedules(filteredSchedules));
     } catch (error) {
       console.error('Failed to load schedules:', error);
     }
