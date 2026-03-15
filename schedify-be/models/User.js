@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 
 // User schema for all roles: student, professor, admin
-const userSchema = new mongoose.Schema({
 
+const userSchema = new mongoose.Schema({
   // Basic info
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
@@ -24,6 +24,10 @@ const userSchema = new mongoose.Schema({
 
   // For Expo push notifications
   expoPushToken: { type: String },
+
+  // For password reset
+  resetPasswordToken: { type: String },
+  resetPasswordExpires: { type: Date },
 
 }, { timestamps: true }); // automatically adds createdAt and updatedAt
 
