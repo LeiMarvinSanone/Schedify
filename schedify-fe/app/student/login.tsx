@@ -91,13 +91,24 @@ const Login = () => {
         {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
       </View>
 
-      <TouchableOpacity style={styles.button} disabled={isLoading} onPress={handleSubmit} activeOpacity={0.8}>
-        <Text style={styles.buttonText}>{isLoading ? 'Logging in...' : 'Login'}</Text>
+
+      {/* Forgot Password link below password field */}
+      <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'flex-end' }}>
+        <TouchableOpacity onPress={() => router.push('/student/forgot-password' as any)}>
+          <Text style={[styles.linkText, { marginTop: 8, marginBottom: 16 }]}>Forgot Password?</Text>
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity style={[styles.button, { height: 56, minWidth: 220, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }]} disabled={isLoading} onPress={handleSubmit} activeOpacity={0.8}>
+        <Text style={[styles.buttonText, { fontSize: 20, textAlign: 'center' }]}>{isLoading ? 'Logging in...' : 'Login'}</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={() => router.push('/student/signup' as any)}>
-        <Text style={styles.linkText}>Create an account</Text>
-      </TouchableOpacity>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+        <Text style={{ color: '#a0aec0', fontSize: 15 }}>Don&apos;t have an account? </Text>
+        <TouchableOpacity onPress={() => router.push('/student/signup' as any)}>
+          <Text style={[styles.linkText, { fontSize: 15, fontWeight: 'bold', color: '#68d391' }]}>Sign up</Text>
+        </TouchableOpacity>
+      </View>
 
     </ScrollView>
   );

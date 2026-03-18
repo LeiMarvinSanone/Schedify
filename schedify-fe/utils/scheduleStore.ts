@@ -20,6 +20,7 @@ export interface StoredCalendarEvent {
   department?: string;
   org?: string;
   description?: string;
+  tag?: string;
 }
 
 const listeners = new Set<() => void>();
@@ -136,17 +137,15 @@ export async function updatePostedCalendarEvent(id: string, updates: Partial<Omi
     const scheduleId = id.includes('-') ? id.split('-')[0] : id;
     
     const updateData: Partial<CreateScheduleInput> = {};
-    
-    if (updates.label) {
-      updateData.tag = updates.label;
+    // Update tag directly if present
+    if (updates.tag) {
+      updateData.tag = updates.tag;
     }
+    // Update department if present
     if (updates.department) {
       updateData.department = updates.department;
     }
-    if (updates.description) {
-      updateData.tag = updates.description;
-    }
-    
+    // Optionally update other fields as needed (add more mappings here)
     await apiUpdateSchedule(scheduleId, updateData);
     notifyScheduleChange();
   } catch (error) {

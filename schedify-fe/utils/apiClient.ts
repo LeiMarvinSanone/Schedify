@@ -1,3 +1,11 @@
+// Reset Password API
+export async function resetPassword(email: string, token: string, newPassword: string) {
+  return await apiCall<{ message: string }>('/api/auth/reset-password', 'POST', { email, token, newPassword });
+}
+// Forgot Password API
+export async function forgotPassword(email: string) {
+  return await apiCall<{ message: string }>('/api/auth/forgot-password', 'POST', { email });
+}
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const BASE_URL = 'https://schedify-be.onrender.com';

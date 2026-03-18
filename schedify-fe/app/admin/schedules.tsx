@@ -92,7 +92,8 @@ interface ScheduleItem {
   scheduleType: 'Class Schedules' | 'Events' | 'Suspension';
   title: string;
   tag: string;
-  date?: string;
+  date?: string; // for display
+  rawDate?: string; // for editing
   time?: string;
   room?: string;
   building?: string;
@@ -320,6 +321,7 @@ export default function SchedulesScreen() {
     course: '',
     block: '',
     yearLevel: '',
+    date: '',
   });
 
   const loadPostedEvents = async () => {
@@ -341,9 +343,16 @@ export default function SchedulesScreen() {
           : [{ name: schedule.tag || 'Untitled', day: '', timeRange: '', room: '' }];
 
         subjects.forEach((subject, subjectIndex) => {
-          const formattedDate = subject.day && /^\d{4}-\d{2}-\d{2}$/.test(subject.day)
-            ? subject.day.split('-').slice(1).join('-').replace('-', ' ').replace(/^0/, '')
-            : subject.day || undefined;
+          // Always show the date for events and suspensions, and keep the original format for editing
+          let formattedDate = undefined;
+          if (subject.day && /^\d{4}-\d{2}-\d{2}$/.test(subject.day)) {
+            // For display: e.g. '03-14' => 'Mar 14'
+            const [, month, day] = subject.day.split('-');
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            formattedDate = `${monthNames[parseInt(month, 10) - 1]} ${parseInt(day, 10)}`;
+          } else if (subject.day) {
+            formattedDate = subject.day;
+          }
 
           let tagValue = '';
           if (postType === 'class') {
@@ -362,7 +371,8 @@ export default function SchedulesScreen() {
             scheduleType: schedule.type,
             title: subject.name,
             tag: tagValue,
-            date: formattedDate,
+            date: formattedDate, // for display
+            rawDate: subject.day || '', // for editing
             time: subject.timeRange,
             room: subject.room,
             building: subject.building,
@@ -410,6 +420,7 @@ export default function SchedulesScreen() {
       course: item.course || '',
       block: item.block || '',
       yearLevel: item.yearLevel || '',
+      date: item.rawDate || '',
     });
   };
 
@@ -432,13 +443,23 @@ export default function SchedulesScreen() {
           name: editForm.title,
           timeRange: editForm.time || 'TBA',
           room: editForm.room || undefined,
+          // Only update day/date for event/suspension
+          ...(editingItem.scheduleType !== 'Class Schedules' && editForm.date
+            ? { day: editForm.date }
+            : {}),
         };
       }
 
-      await updateSchedule(scheduleId, {
+      const updatePayload = {
         tag: editForm.tag || currentSchedule.tag,
+        department: editForm.department || currentSchedule.department,
+        course: editForm.course || currentSchedule.course,
+        yearLevel: editForm.yearLevel || currentSchedule.yearLevel,
+        block: editForm.block || currentSchedule.block,
         subjects: nextSubjects,
-      });
+      };
+      console.log('🟡 UpdateSchedule Payload:', updatePayload);
+      await updateSchedule(scheduleId, updatePayload);
 
       setEditingItem(null);
       await loadPostedEvents();
@@ -478,9 +499,9 @@ export default function SchedulesScreen() {
           activeOpacity={1}
           onPress={() => setEditingItem(null)}
         />
-        <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+        <View style={[styles.modalContent, { backgroundColor: theme.card }]}> 
           <Text style={[styles.modalTitle, { color: theme.title }]}>Edit Schedule</Text>
-          
+
           <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Title</Text>
           <TextInput
             style={[styles.modalInput, { backgroundColor: theme.input, color: theme.text, borderColor: theme.divider }]}
@@ -489,6 +510,20 @@ export default function SchedulesScreen() {
             placeholder="Enter title"
             placeholderTextColor={theme.muted}
           />
+
+          {/* Only show date field for Events and Suspensions */}
+          {editingItem && editingItem.scheduleType !== 'Class Schedules' && (
+            <>
+              <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Date</Text>
+              <TextInput
+                style={[styles.modalInput, { backgroundColor: theme.input, color: theme.text, borderColor: theme.divider }]}
+                value={editForm.date}
+                onChangeText={text => setEditForm(prev => ({ ...prev, date: text }))}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={theme.muted}
+              />
+            </>
+          )}
 
           <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Tag (Department/Group)</Text>
           <Dropdown
