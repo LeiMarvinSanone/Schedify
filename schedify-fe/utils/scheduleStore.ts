@@ -1,3 +1,16 @@
+// Helper: Get next date for a given day of week (e.g., 'Monday')
+function getNextDateForDay(day: string): string {
+  const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const today = new Date();
+  const todayIdx = today.getDay();
+  const targetIdx = daysOfWeek.indexOf(day.toLowerCase());
+  if (targetIdx === -1) return today.toISOString().split('T')[0];
+  let diff = targetIdx - todayIdx;
+  if (diff < 0) diff += 7;
+  const nextDate = new Date(today);
+  nextDate.setDate(today.getDate() + diff);
+  return nextDate.toISOString().split('T')[0];
+}
 import { 
   getSchedules as apiGetSchedules, 
   createSchedule as apiCreateSchedule, 
@@ -56,9 +69,11 @@ function convertScheduleToEvents(schedule: Schedule): StoredCalendarEvent[] {
   // If schedule has subjects, create an event for each subject
   if (schedule.subjects && schedule.subjects.length > 0) {
     schedule.subjects.forEach((subject, index) => {
+      // Try to use subject.day if available, otherwise fallback to today
+      const date = subject.day ? getNextDateForDay(subject.day) : new Date().toISOString().split('T')[0];
       events.push({
         id: `${schedule._id}-${index}`,
-        date: new Date().toISOString().split('T')[0], // Default to today
+        date,
         label: subject.name,
         type: eventType,
         time: subject.timeRange,

@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { login as apiLogin } from '../../utils/apiClient';
+import * as Notifications from 'expo-notifications';
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -30,8 +31,15 @@ const Login = () => {
 
     try {
       setIsLoading(true);
-      await apiLogin(formData.email, formData.password);
-
+      // Get Expo push token
+      let expoPushToken = undefined;
+      try {
+        const { data } = await Notifications.getExpoPushTokenAsync();
+        expoPushToken = data;
+      } catch (e) {
+        expoPushToken = undefined;
+      }
+      await apiLogin(formData.email, formData.password, undefined, expoPushToken);
       router.replace('/student/calendar' as any);
     } catch {
       Alert.alert('Error', 'Login failed. Invalid email or password.');

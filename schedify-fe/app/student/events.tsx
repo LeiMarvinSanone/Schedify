@@ -311,6 +311,8 @@ export default function EventsScreen() {
       let filteredSchedules = schedules;
       if (student) {
         filteredSchedules = schedules.filter(schedule => {
+          // Always include if tag is 'whole-university'
+          if (normalize(schedule.tag) === 'whole-university') return true;
           return (
             normalize(schedule.department) === normalize(student.department) &&
             normalize(schedule.course) === normalize(student.course) &&

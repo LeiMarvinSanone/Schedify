@@ -1,10 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import * as Linking from 'expo-linking';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image, StatusBar, ScrollView } from 'react-native';
 import { forgotPassword } from '../../utils/apiClient';
 
+
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
+  const [token, setToken] = useState('');
   const [loading, setLoading] = useState(false);
+  // Deep link handler
+  useEffect(() => {
+    const handleDeepLink = (event: Linking.EventType) => {
+      const url = event.url || '';
+      const parsed = Linking.parse(url);
+      if (parsed && parsed.path && parsed.path.startsWith('reset-password')) {
+        const { token, email } = parsed.queryParams || {};
+        if (token && email) {
+          setToken(Array.isArray(token) ? token[0] : token);
+          setEmail(Array.isArray(email) ? email[0] : email);
+        }
+      }
+    };
+    // Listen for incoming links
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+    // Check if app was opened from a link
+    (async () => {
+      const initialUrl = await Linking.getInitialURL();
+      if (initialUrl) {
+        handleDeepLink({ url: initialUrl } as any);
+      }
+    })();
+    return () => subscription.remove();
+  }, []);
 
   const handleForgotPassword = async () => {
     if (!email) {

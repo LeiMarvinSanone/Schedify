@@ -179,10 +179,12 @@ export async function signup(signupData: SignupInput): Promise<AuthResponse> {
 export async function login(
   email: string,
   password: string,
-  role?: string
+  role?: string,
+  expoPushToken?: string
 ): Promise<AuthResponse> {
   const payload: any = { email, password };
   if (role) payload.role = role;
+  if (expoPushToken) payload.expoPushToken = expoPushToken;
   const response = await apiCall<ApiResponse<AuthResponse> | AuthResponse>(
     '/api/auth/login',
     'POST',
