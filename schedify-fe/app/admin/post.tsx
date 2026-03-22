@@ -663,7 +663,10 @@ function EventSuspensionForm({ type }: { type: 'event' | 'suspension' }) {
   const [date, setDate]           = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime]     = useState('');
-  const [tag, setTag]             = useState('');
+  const [department, setDepartment] = useState('');
+  const [course, setCourse]         = useState('');
+  const [yearLevel, setYearLevel]   = useState('');
+  const [block, setBlock]           = useState('');
   const [startTimeType, setStartTimeType] = useState<'dropdown' | 'other'>('dropdown');
   const [endTimeType, setEndTimeType] = useState<'dropdown' | 'other'>('dropdown');
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -675,12 +678,18 @@ function EventSuspensionForm({ type }: { type: 'event' | 'suspension' }) {
   const formBg      = isDark ? '#14142a' : '#f8faff';
   const formBorder  = isDark ? accentColor + '33' : accentColor + '44';
 
-  const tagOptions = ['whole-university', 'BSIT', 'BSCS', 'BSIS', 'BTVTED', 'BSA', 'BSAIS', 'BSE', 'BPA', 'CICT Dept', 'CBME Dept'];
+  const departmentOptions = ['Whole University', 'CICT', 'CBME', ''];
+  const courseMap: Record<string, string[]> = {
+    CICT: ['', 'BIT', 'BIS', 'BSCS', 'BTVTED'],
+    CBME: ['', 'BSA', 'BSAIS', 'BSE', 'BPA'],
+  };
+  const courseOptions = department ? courseMap[department] || [''] : [''];
+  const yearLevelOptions = ['', '1st Year', '2nd Year', '3rd Year', '4th Year'];
+  const blockOptions = ['', 'Block A', 'Block B', 'Block C', 'Block D'];
 
   const handlePost = async () => {
     const safeTitle = title.trim();
     const safeDate = date.trim();
-    const safeTag = tag.trim();
 
     if (!safeTitle || !safeDate) {
       Alert.alert('Missing required fields', 'Please provide at least title and date.');
@@ -714,9 +723,14 @@ function EventSuspensionForm({ type }: { type: 'event' | 'suspension' }) {
     }
 
     try {
+      const isWholeUniversity = department === 'Whole University';
       await createSchedule({
         type: type === 'event' ? 'Events' : 'Suspension',
-        tag: safeTag || 'whole-university',
+        department: isWholeUniversity ? undefined : department || undefined,
+        course: isWholeUniversity ? undefined : course || undefined,
+        yearLevel: isWholeUniversity ? undefined : yearLevel || undefined,
+        block: isWholeUniversity ? undefined : block || undefined,
+        tag: isWholeUniversity ? 'whole-university' : undefined,
         subjects: [{
           name: safeTitle,
           day: safeDate,
@@ -726,7 +740,6 @@ function EventSuspensionForm({ type }: { type: 'event' | 'suspension' }) {
       });
 
       Alert.alert('Posted', `${type === 'event' ? 'Event' : 'Suspension'} added to calendar.`);
-      
       // Reset form
       setTitle('');
       setDesc('');
@@ -735,7 +748,10 @@ function EventSuspensionForm({ type }: { type: 'event' | 'suspension' }) {
       setDate('');
       setStartTime('');
       setEndTime('');
-      setTag('');
+      setDepartment('');
+      setCourse('');
+      setYearLevel('');
+      setBlock('');
     } catch (error: any) {
       Alert.alert('Post failed', error.message || 'Could not post. Please try again.');
       console.error('Failed to post:', error);
@@ -891,14 +907,25 @@ function EventSuspensionForm({ type }: { type: 'event' | 'suspension' }) {
         </View>
       )}
 
-      <Text style={[styles.label, { color: theme.muted }]}>AUDIENCE TAG</Text>
-      <Dropdown value={tag} options={tagOptions} onSelect={setTag} placeholder="Who sees this?" />
+      <Text style={[styles.label, { color: theme.muted }]}>TARGET AUDIENCE</Text>
+      <Text style={[styles.label, { color: theme.muted, marginTop: 8 }]}>Department</Text>
+      <Dropdown value={department} options={departmentOptions} onSelect={setDepartment} placeholder="Select department (optional)" />
+      <Text style={[styles.label, { color: theme.muted, marginTop: 8 }]}>Course</Text>
+      <Dropdown value={course} options={courseOptions} onSelect={setCourse} placeholder="Select course (optional)" />
+      <Text style={[styles.label, { color: theme.muted, marginTop: 8 }]}>Year Level</Text>
+      <Dropdown value={yearLevel} options={yearLevelOptions} onSelect={setYearLevel} placeholder="Select year level (optional)" />
+      <Text style={[styles.label, { color: theme.muted, marginTop: 8 }]}>Block</Text>
+      <Dropdown value={block} options={blockOptions} onSelect={setBlock} placeholder="Select block (optional)" />
       <View style={{ height: 16 }} />
-
-      {tag !== '' && (
+      {(department || course || yearLevel || block) && (
         <View style={[styles.tagDisplay, { backgroundColor: accentBg, borderColor: accentColor + '55' }]}>
           <Text style={[styles.tagDisplayText, { color: accentColor }]}>
-            {type === 'event' ? '📢' : '⚠️'} This will be sent to: {tag}
+            {type === 'event' ? '📢' : '⚠️'} This will be sent to:
+            {department ? ` Dept: ${department}` : ''}
+            {course ? `, Course: ${course}` : ''}
+            {yearLevel ? `, Year: ${yearLevel}` : ''}
+            {block ? `, Block: ${block}` : ''}
+            {!(department || course || yearLevel || block) ? ' Everyone' : ''}
           </Text>
         </View>
       )}

@@ -118,13 +118,16 @@ function buildEventsData(schedules: Awaited<ReturnType<typeof getSchedules>>): R
 
     schedule.subjects.forEach((subject) => {
       const normalizedDate = normalizeToIsoDate(subject.day);
+      // Build a display string from department, course, yearLevel, block
+      const parts = [schedule.department, schedule.course, schedule.yearLevel, schedule.block].filter(Boolean);
+      const audience = parts.length > 0 ? parts.join(' | ') : 'All';
       merged[eventType].items.unshift({
         id: schedule._id + '-' + subject.name,
         title: subject.name,
         time: subject.timeRange,
         room: subject.room,
         department: schedule.department,
-        description: schedule.tag || schedule.course,
+        description: audience,
         date: formatShortDate(normalizedDate),
       });
     });
@@ -313,15 +316,14 @@ export default function EventsScreen() {
         filteredSchedules = schedules.filter(schedule => {
           // Always include if tag is 'whole-university'
           if (normalize(schedule.tag) === 'whole-university') return true;
-          return (
-            normalize(schedule.department) === normalize(student.department) &&
-            normalize(schedule.course) === normalize(student.course) &&
-            normalize(schedule.yearLevel) === normalize(student.yearLevel) &&
-            (
-              normalize(schedule.block) === normalize(student.block) ||
-              normalize(schedule.tag) === normalize(`${student.course} ${student.block}`)
-            )
-          );
+          // Helper to safely access fields
+          const getField = (s: any, f: 'department'|'course'|'yearLevel'|'block') => s && typeof s === 'object' ? s[f] : undefined;
+          const fields: Array<'department'|'course'|'yearLevel'|'block'> = ['department', 'course', 'yearLevel', 'block'];
+          return fields.every(field => {
+            const schedVal = normalize(getField(schedule, field));
+            const studVal = normalize(getField(student, field));
+            return !schedVal || schedVal === studVal;
+          });
         });
       }
 

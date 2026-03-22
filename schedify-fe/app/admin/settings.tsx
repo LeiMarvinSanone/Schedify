@@ -47,10 +47,10 @@ export default function SettingsScreen() {
         onPress: async () => {
           try {
             await apiLogout();
-            router.replace('/admin/welcome' as any);
+            router.replace('/student/welcome' as any);
           } catch (error) {
             console.error('Logout error:', error);
-            router.replace('/admin/welcome' as any);
+            router.replace('/student/welcome' as any);
           }
         },
       },

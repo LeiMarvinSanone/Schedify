@@ -119,6 +119,7 @@ function recurringDateKeysForDay(value: string, weeksAhead = 16): string[] {
 function transformBackendSchedules(schedules: Awaited<ReturnType<typeof getSchedules>>): Record<string, CalEvent[]> {
   const events: Record<string, CalEvent[]> = {};  
 
+
   schedules.forEach((schedule) => {
     if (!schedule.subjects || schedule.subjects.length === 0) return;
 
@@ -127,9 +128,31 @@ function transformBackendSchedules(schedules: Awaited<ReturnType<typeof getSched
       schedule.type === 'Events' ? 'event' : 'suspension';
 
     schedule.subjects.forEach((subject) => {
-      const dateKeys = schedule.type === 'Class Schedules'
-        ? recurringDateKeysForDay(subject.day)
-        : [normalizeToDateKey(subject.day)].filter(Boolean);
+      let dateKeys: string[] = [];
+      if (schedule.type === 'Class Schedules') {
+        dateKeys = recurringDateKeysForDay(subject.day);
+      } else {
+        // Handle single date, date range, or malformed
+        const dayStr = (subject.day || '').trim();
+        // Check for date range: "YYYY-MM-DD to YYYY-MM-DD"
+        const rangeMatch = dayStr.match(/^(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})$/i);
+        if (rangeMatch) {
+          const [_, start, end] = rangeMatch;
+          const startDate = new Date(start);
+          const endDate = new Date(end);
+          if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime()) && startDate <= endDate) {
+            let d = new Date(startDate);
+            while (d <= endDate) {
+              dateKeys.push(toIsoDate(d));
+              d.setDate(d.getDate() + 1);
+            }
+          }
+        } else {
+          // Single date or fallback
+          const key = normalizeToDateKey(dayStr);
+          if (key) dateKeys = [key];
+        }
+      }
 
       // Fallback: if day is malformed, still show the item on schedule creation date.
       const effectiveDateKeys = dateKeys.length > 0
@@ -800,15 +823,14 @@ export default function CalendarScreen() {
       const filteredSchedules = schedules.filter(schedule => {
         // Always include if tag is 'whole-university'
         if (normalize(schedule.tag) === 'whole-university') return true;
-        return (
-          normalize(schedule.department) === normalize(student.department) &&
-          normalize(schedule.course) === normalize(student.course) &&
-          normalize(schedule.yearLevel) === normalize(student.yearLevel) &&
-          (
-            normalize(schedule.block) === normalize(student.block) ||
-            normalize(schedule.tag) === normalize(`${student.course} ${student.block}`)
-          )
-        );
+        // Helper to safely access fields
+        const getField = (s: any, f: 'department'|'course'|'yearLevel'|'block') => s && typeof s === 'object' ? s[f] : undefined;
+        const fields: Array<'department'|'course'|'yearLevel'|'block'> = ['department', 'course', 'yearLevel', 'block'];
+        return fields.every(field => {
+          const schedVal = normalize(getField(schedule, field));
+          const studVal = normalize(getField(student, field));
+          return !schedVal || schedVal === studVal;
+        });
       });
       setEventsByDate(transformBackendSchedules(filteredSchedules));
     } catch (error) {
