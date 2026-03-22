@@ -19,11 +19,14 @@ export default function AdminLoginScreen() {
         }
 
         setLoading(true);
-        
         try {
             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             const response = await apiLogin(email, password, 'admin');
-            
+            if (response.user?.role !== 'admin') {
+                Alert.alert('Access Denied', 'You are not authorized to access the admin panel.');
+                setLoading(false);
+                return;
+            }
             if (response.token) {
                 router.replace('/admin/dashboard' as any);
             } else {
