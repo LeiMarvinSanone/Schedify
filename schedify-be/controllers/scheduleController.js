@@ -115,31 +115,24 @@ export const getSchedules = async (req, res) => {
       block: user.block,
     };
 
-    const targetFields = ['department', 'course', 'yearLevel', 'block'];
+    // For each field, match if schedule's field is empty/null/missing OR matches user's value
+    const andConditions = [
+      { $or: [ { tag: 'whole-university' }, { tag: { $exists: false } }, { tag: null }, { tag: '' } ] },
+    ];
+    ['department', 'course', 'yearLevel', 'block'].forEach(field => {
+      const value = userFields[field];
+      andConditions.push({
+        $or: [
+          { [field]: { $exists: false } },
+          { [field]: null },
+          { [field]: '' },
+          { [field]: value },
+        ]
+      });
+    });
 
-    const tagFilter = {
-      $or: [
-        { tag: 'whole-university' },
-        {
-          $and: targetFields.map((field) => {
-            const value = userFields[field];
-            return {
-              $or: [
-                { [field]: { $exists: false } },
-                { [field]: null },
-                { [field]: '' },
-                { [field]: value },
-              ],
-            };
-          }),
-        },
-      ],
-    };
-
-    // Combine tag filter and search filter
-    const finalFilter = search ? {
-      $and: [tagFilter, searchFilter]
-    } : tagFilter;
+    // Remove the tag: 'whole-university' from the per-field logic, only match it once at the top
+    const finalFilter = search ? { $and: [ { $and: andConditions }, searchFilter ] } : { $and: andConditions };
 
     const schedules = await Schedule.find(finalFilter);
     res.status(200).json(schedules);
