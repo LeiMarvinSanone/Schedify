@@ -8,7 +8,6 @@ const ForgotPassword = () => {
   const [email, setEmail] = useState('');
   const [token, setToken] = useState('');
   const [loading, setLoading] = useState(false);
-  // Deep link handler
   useEffect(() => {
     const handleDeepLink = (event: Linking.EventType) => {
       const url = event.url || '';

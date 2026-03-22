@@ -35,6 +35,15 @@ export default function WelcomeScreen() {
       >
         <Text style={styles.buttonText}>Get Started</Text>
       </TouchableOpacity>
+
+      {/* Admin Login Link */}
+      <TouchableOpacity
+        style={styles.adminLink}
+        onPress={() => router.push('/admin/login' as any)}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.adminLinkText}>Admin</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -86,5 +95,16 @@ const styles = StyleSheet.create({
     color: '#e2e8f0',
     fontSize: 18,
     fontWeight: '400',
+  },
+  adminLink: {
+    marginTop: 24,
+    padding: 8,
+  },
+  adminLinkText: {
+    color: '#90cdf4',
+    fontSize: 16,
+    textAlign: 'center',
+    textDecorationLine: 'underline',
+    fontWeight: '500',
   },
 });
