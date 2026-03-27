@@ -61,9 +61,9 @@ function parseSubjectsFromCSV(raw: string): Subject[] {
 
     // Auto-generate tag if not present
     let tag = get(iTag);
-    // If professor is present, include in tag for professor-only targeting
-    if (!tag && (iCourse !== -1 || iYearLevel !== -1 || iBlock !== -1 || iProf !== -1)) {
-      tag = [get(iCourse), get(iYearLevel), get(iBlock), get(iProf)].filter(Boolean).join(' ');
+    // Auto-generate tag for class schedules (exclude professor, match backend)
+    if (!tag && (iCourse !== -1 || iYearLevel !== -1 || iBlock !== -1)) {
+      tag = [get(iCourse), get(iYearLevel), get(iBlock)].filter(Boolean).join(' ');
     }
 
     const rawDay = get(iDay);

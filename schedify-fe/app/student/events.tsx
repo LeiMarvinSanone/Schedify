@@ -8,7 +8,7 @@ import { useTheme } from '../../ThemeContext';
 import { ICONS } from '../../constants/icons';
 import BottomNav from '../../components/BottomNav';
 import { useFocusEffect } from '@react-navigation/native';
-import { getSchedules, getCurrentUser } from '../../utils/apiClient';
+import { getSchedules } from '../../utils/apiClient';
 import {
   getClassReminderOverrides,
   getDefaultClassReminder,
@@ -297,40 +297,20 @@ export default function EventsScreen() {
   const [defaultReminder, setDefaultReminder] = useState<ReminderOption>('30m');
   const [reminderOverrides, setReminderOverrides] = useState<Record<string, ReminderOption>>({});
 
-  // Helper to normalize strings for robust comparison
-  function normalize(str?: string) {
-    return (str || '').trim().toLowerCase().replace(/\s+/g, '');
-  }
-
   const reloadEvents = useCallback(async () => {
     try {
-      const [schedules, currentDefault, currentOverrides, student] = await Promise.all([
+      // The backend already filters schedules for the authenticated student.
+      // Do not re-filter on the client — local user data from getCurrentUser()
+      // can be stale or incomplete and would incorrectly exclude valid schedules.
+      const [schedules, currentDefault, currentOverrides] = await Promise.all([
         getSchedules(),
         getDefaultClassReminder(),
         getClassReminderOverrides(),
-        getCurrentUser(),
       ]);
 
-      let filteredSchedules = schedules;
-      if (student) {
-        filteredSchedules = schedules.filter(schedule => {
-          // Always include if tag is 'whole-university'
-          if (normalize(schedule.tag) === 'whole-university') return true;
-          // Helper to safely access fields
-          const getField = (s: any, f: 'department'|'course'|'yearLevel'|'block') => s && typeof s === 'object' ? s[f] : undefined;
-          const fields: Array<'department'|'course'|'yearLevel'|'block'> = ['department', 'course', 'yearLevel', 'block'];
-          return fields.every(field => {
-            const schedVal = normalize(getField(schedule, field));
-            const studVal = normalize(getField(student, field));
-            return !schedVal || schedVal === studVal;
-          });
-        });
-      }
-
-      setData(buildEventsData(filteredSchedules));
+      setData(buildEventsData(schedules));
       setDefaultReminder(currentDefault);
       setReminderOverrides(currentOverrides);
-      // Note: syncClassReminderNotifications needs backend schedules format
     } catch (error) {
       console.error('Failed to load events:', error);
     }
@@ -338,22 +318,8 @@ export default function EventsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      let active = true;
-
-      (async () => {
-        try {
-          const schedules = await getSchedules();
-          if (!active) return;
-          setData(buildEventsData(schedules));
-        } catch (error) {
-          console.error('Failed to load events:', error);
-        }
-      })();
-
-      return () => {
-        active = false;
-      };
-    }, [])
+      void reloadEvents();
+    }, [reloadEvents])
   );
 
   useEffect(() => {

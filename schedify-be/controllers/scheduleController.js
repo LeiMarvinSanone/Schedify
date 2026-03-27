@@ -115,24 +115,39 @@ export const getSchedules = async (req, res) => {
       block: user.block,
     };
 
-    // For each field, match if schedule's field is empty/null/missing OR matches user's value
-    const andConditions = [
-      { $or: [ { tag: 'whole-university' }, { tag: { $exists: false } }, { tag: null }, { tag: '' } ] },
-    ];
-    ['department', 'course', 'yearLevel', 'block'].forEach(field => {
-      const value = userFields[field];
-      andConditions.push({
-        $or: [
-          { [field]: { $exists: false } },
-          { [field]: null },
-          { [field]: '' },
-          { [field]: value },
-        ]
-      });
-    });
+    // Build student's composite tag (case-insensitive, e.g. "bscs 3rd year block b")
+    const userTag = [user.course, user.yearLevel, user.block].filter(Boolean).join(' ').trim().toLowerCase();
 
-    // Remove the tag: 'whole-university' from the per-field logic, only match it once at the top
-    const finalFilter = search ? { $and: [ { $and: andConditions }, searchFilter ] } : { $and: andConditions };
+    // A schedule is visible to a student if ANY of these are true:
+    //   1. Tag is 'whole-university' (visible to everyone)
+    //   2. Tag matches the student's composite tag (case-insensitive) — tag match alone is sufficient
+    //   3. Schedule has no tag at all — fall back to field-by-field matching
+    //
+    // NOTE: When a tag is present and matches, we do NOT also require individual
+    // field equality. That double-check causes silent exclusions when field values
+    // differ by casing or spacing between the schedule and the student's profile.
+    const audienceFilter = {
+      $or: [
+        // Rule 1: whole-university schedules are visible to all students
+        { $expr: { $eq: [ { $toLower: { $trim: { input: '$tag' } } }, 'whole-university' ] } },
+
+        // Rule 2: tag matches student's composite tag (case-insensitive) — sufficient on its own
+        ...(userTag ? [{ $expr: { $eq: [ { $toLower: { $trim: { input: '$tag' } } }, userTag ] } }] : []),
+
+        // Rule 3: no tag set — match by individual fields (each field: empty/missing OR equals student's value)
+        {
+          $and: [
+            { $or: [ { tag: { $exists: false } }, { tag: null }, { tag: '' } ] },
+            { $or: [ { department: { $exists: false } }, { department: null }, { department: '' }, { department: userFields.department } ] },
+            { $or: [ { course:     { $exists: false } }, { course: null },     { course: '' },     { course: userFields.course }         ] },
+            { $or: [ { yearLevel:  { $exists: false } }, { yearLevel: null },  { yearLevel: '' },  { yearLevel: userFields.yearLevel }    ] },
+            { $or: [ { block:      { $exists: false } }, { block: null },      { block: '' },      { block: userFields.block }            ] },
+          ]
+        },
+      ]
+    };
+
+    const finalFilter = search ? { $and: [ audienceFilter, searchFilter ] } : audienceFilter;
 
     const schedules = await Schedule.find(finalFilter);
     res.status(200).json(schedules);
@@ -255,7 +270,8 @@ export const importSchedulesCSV = [
     fs.createReadStream(req.file.path)
       .pipe(parse({ columns: true, trim: true }))
       .on('data', (row) => {
-        const requiredFields = ['name', 'day', 'timeRange', 'room', 'department', 'tag'];
+        // Accept 'time' as the CSV column and map to 'timeRange'
+        const requiredFields = ['name', 'day', 'time', 'room', 'department', 'tag'];
         for (const field of requiredFields) {
           if (!row[field] || typeof row[field] !== 'string' || row[field].trim() === '') {
             errors.push({ status: 'error', row, message: `Missing or empty required field: ${field}` });
@@ -268,8 +284,8 @@ export const importSchedulesCSV = [
           hasError = true;
           return;
         }
-        if (!timeRegex.test(row.timeRange.trim())) {
-          errors.push({ status: 'error', row, message: `Invalid time format: ${row.timeRange}` });
+        if (!timeRegex.test(row.time.trim())) {
+          errors.push({ status: 'error', row, message: `Invalid time format: ${row.time}` });
           hasError = true;
           return;
         }
@@ -284,7 +300,7 @@ export const importSchedulesCSV = [
           subjects: [{
             name: row.name,
             day: row.day,
-            timeRange: row.timeRange,
+            timeRange: row.time, // map 'time' to 'timeRange'
             room: row.room,
             building: row.building || '',
           }],

@@ -8,7 +8,7 @@ import { useTheme } from '../../ThemeContext';
 import { ICONS } from '../../constants/icons';
 import BottomNav from '../../components/BottomNav';
 import { useFocusEffect } from '@react-navigation/native';
-import { getSchedules, getCurrentUser } from '../../utils/apiClient';
+import { getSchedules } from '../../utils/apiClient';
 
 const { width } = Dimensions.get('window');
 
@@ -805,34 +805,13 @@ export default function CalendarScreen() {
   const [eventsByDate, setEventsByDate] = useState<Record<string, CalEvent[]>>(DEFAULT_EVENTS);
 
 
-  // Helper to normalize strings for robust comparison
-  function normalize(str?: string) {
-    return (str || '').trim().toLowerCase().replace(/\s+/g, '');
-  }
-
   const loadSchedules = useCallback(async (searchText?: string) => {
     try {
-      const [schedules, student] = await Promise.all([
-        getSchedules(searchText),
-        getCurrentUser(),
-      ]);
-      if (!student) {
-        setEventsByDate(DEFAULT_EVENTS);
-        return;
-      }
-      const filteredSchedules = schedules.filter(schedule => {
-        // Always include if tag is 'whole-university'
-        if (normalize(schedule.tag) === 'whole-university') return true;
-        // Helper to safely access fields
-        const getField = (s: any, f: 'department'|'course'|'yearLevel'|'block') => s && typeof s === 'object' ? s[f] : undefined;
-        const fields: Array<'department'|'course'|'yearLevel'|'block'> = ['department', 'course', 'yearLevel', 'block'];
-        return fields.every(field => {
-          const schedVal = normalize(getField(schedule, field));
-          const studVal = normalize(getField(student, field));
-          return !schedVal || schedVal === studVal;
-        });
-      });
-      setEventsByDate(transformBackendSchedules(filteredSchedules));
+      // The backend already filters schedules for the authenticated student.
+      // Do not re-filter on the client — local user data from getCurrentUser()
+      // can be stale or incomplete and would incorrectly exclude valid schedules.
+      const schedules = await getSchedules(searchText);
+      setEventsByDate(transformBackendSchedules(schedules));
     } catch (error) {
       console.error('Failed to load schedules:', error);
     }
