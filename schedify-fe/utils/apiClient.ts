@@ -252,12 +252,14 @@ export interface Schedule {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  description?: string;
 }
 
 export interface CreateScheduleInput {
   type: string;
   department?: string;
   course?: string;
+  description?: string;
   yearLevel?: string;
   block?: string;
   semester?: string;

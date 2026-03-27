@@ -173,6 +173,7 @@ export const getScheduleById = async (req, res) => {
 // UPDATE schedule (admin only)
 export const updateSchedule = async (req, res) => {
   try {
+
     // Ensure subjects include 'building' if provided
     let updateBody = { ...req.body };
     if (Array.isArray(req.body.subjects)) {
@@ -184,6 +185,23 @@ export const updateSchedule = async (req, res) => {
         building: sub.building || '',
       }));
     }
+
+    // Recalculate tag if department, course, yearLevel, or block are changed (unless tag is explicitly set)
+    const { department, course, yearLevel, block, tag } = updateBody;
+    if (!tag || tag === '' || tag === undefined) {
+      // Only recalculate if not set to 'whole-university'
+      if (
+        department === 'whole-university' ||
+        department === 'Whole University'
+      ) {
+        updateBody.tag = 'whole-university';
+      } else {
+        // Build tag from fields if any are present
+        const tagParts = [course, yearLevel, block].filter(Boolean);
+        updateBody.tag = tagParts.length > 0 ? tagParts.join(' ') : '';
+      }
+    }
+
     const updated = await Schedule.findByIdAndUpdate(
       req.params.id,
       updateBody,

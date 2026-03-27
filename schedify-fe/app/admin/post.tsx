@@ -722,6 +722,7 @@ function EventSuspensionForm({ type }: { type: 'event' | 'suspension' }) {
       }
     }
 
+
     try {
       const isWholeUniversity = department === 'Whole University';
       await createSchedule({
@@ -731,6 +732,7 @@ function EventSuspensionForm({ type }: { type: 'event' | 'suspension' }) {
         yearLevel: isWholeUniversity ? undefined : yearLevel || undefined,
         block: isWholeUniversity ? undefined : block || undefined,
         tag: isWholeUniversity ? 'whole-university' : undefined,
+        description: description.trim() || undefined,
         subjects: [{
           name: safeTitle,
           day: safeDate,

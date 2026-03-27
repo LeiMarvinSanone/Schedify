@@ -365,6 +365,7 @@ export default function SchedulesScreen() {
             tagValue = schedule.tag || schedule.department || 'Posted';
           }
           const item: ScheduleItem = {
+
             id: `${schedule._id}-${subjectIndex}`,
             scheduleId: schedule._id,
             subjectIndex,
@@ -377,7 +378,10 @@ export default function SchedulesScreen() {
             room: subject.room,
             building: subject.building,
             organization: schedule.department,
-            description: schedule.semester || schedule.yearLevel,
+            description:
+              (schedule.type === 'Events' || schedule.type === 'Suspension')
+                ? (schedule.description || schedule.semester || schedule.yearLevel)
+                : (schedule.semester || schedule.yearLevel),
           };
 
           newData[postType].unshift(item);

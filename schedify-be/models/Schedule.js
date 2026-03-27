@@ -31,6 +31,9 @@ const scheduleSchema = new mongoose.Schema({
   // Subjects list (for Class Schedules)
   subjects: [subjectSchema],
 
+  // Description for events/suspensions (optional)
+  description: { type: String },
+
   // Who created this (admin)
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,

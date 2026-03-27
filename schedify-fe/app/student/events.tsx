@@ -127,7 +127,9 @@ function buildEventsData(schedules: Awaited<ReturnType<typeof getSchedules>>): R
         time: subject.timeRange,
         room: subject.room,
         department: schedule.department,
-        description: audience,
+        description: (schedule.type === 'Events' || schedule.type === 'Suspension')
+          ? (schedule.description || audience)
+          : audience,
         date: formatShortDate(normalizedDate),
       });
     });
