@@ -24,6 +24,8 @@ const userSchema = new mongoose.Schema({
 
   // For Expo push notifications
   expoPushToken: { type: String },
+  googleId: { type: String }, // Google user ID
+  picture: { type: String },  // Google profile picture
 
   // For password reset
   resetPasswordToken: { type: String },
