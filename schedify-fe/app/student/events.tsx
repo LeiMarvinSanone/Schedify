@@ -112,9 +112,11 @@ function buildEventsData(schedules: Awaited<ReturnType<typeof getSchedules>>): R
   schedules.forEach((schedule) => {
     if (!schedule.subjects || schedule.subjects.length === 0) return;
 
-    const eventType: EventType = 
-      schedule.type === 'Class Schedules' ? 'class' :
-      schedule.type === 'Events' ? 'event' : 'suspension';
+    // Normalize type for robust matching
+    const typeNorm = (schedule.type || '').toLowerCase();
+    const eventType: EventType =
+      typeNorm === 'class schedules' || typeNorm === 'class' ? 'class' :
+      typeNorm === 'events' || typeNorm === 'event' ? 'event' : 'suspension';
 
     schedule.subjects.forEach((subject) => {
       const normalizedDate = normalizeToIsoDate(subject.day);
@@ -127,7 +129,8 @@ function buildEventsData(schedules: Awaited<ReturnType<typeof getSchedules>>): R
         time: subject.timeRange,
         room: subject.room,
         department: schedule.department,
-        description: (schedule.type === 'Events' || schedule.type === 'Suspension')
+        // Always show description if present for events and suspensions
+        description: (eventType === 'event' || eventType === 'suspension')
           ? (schedule.description || audience)
           : audience,
         date: formatShortDate(normalizedDate),
@@ -137,7 +140,6 @@ function buildEventsData(schedules: Awaited<ReturnType<typeof getSchedules>>): R
 
   return merged;
 }
-
 
 function AccordionSection({
   type,
@@ -211,7 +213,7 @@ function AccordionSection({
                     {(item.department || item.org) && <Text style={[acc.metaChip, { color: metaColor }]}>{ICONS.meta.organization} {item.department || item.org}</Text>}
                   </View>
                   {item.description && (
-                    <Text style={[acc.itemDesc, { color: descColor }]} numberOfLines={2}>
+                    <Text style={[acc.itemDesc, { color: descColor }]}> 
                       {item.description}
                     </Text>
                   )}
