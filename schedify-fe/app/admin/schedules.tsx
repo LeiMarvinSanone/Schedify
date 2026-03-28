@@ -378,6 +378,9 @@ export default function SchedulesScreen() {
             room: subject.room,
             building: subject.building,
             organization: schedule.department,
+            course: schedule.course,
+            block: schedule.block,
+            yearLevel: schedule.yearLevel,
             description:
               (schedule.type === 'Events' || schedule.type === 'Suspension')
                 ? (schedule.description || schedule.semester || schedule.yearLevel)
@@ -454,13 +457,22 @@ export default function SchedulesScreen() {
         };
       }
 
+      // Derive tag fresh from the edited dropdowns so the backend re-routes correctly
+      let tagToSend: string;
+      if (editForm.department === 'Whole University') {
+        tagToSend = 'whole-university';
+      } else {
+        const tagParts = [editForm.course, editForm.yearLevel, editForm.block].filter(Boolean);
+        tagToSend = tagParts.join(' ');
+      }
       const updatePayload = {
-        tag: editForm.tag || currentSchedule.tag,
+        tag: tagToSend,
         department: editForm.department || currentSchedule.department,
         course: editForm.course || currentSchedule.course,
         yearLevel: editForm.yearLevel || currentSchedule.yearLevel,
         block: editForm.block || currentSchedule.block,
         subjects: nextSubjects,
+        description: editForm.description,
       };
       console.log('🟡 UpdateSchedule Payload:', updatePayload);
       await updateSchedule(scheduleId, updatePayload);
