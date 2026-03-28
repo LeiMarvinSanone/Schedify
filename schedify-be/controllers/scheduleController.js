@@ -39,6 +39,7 @@ export const createSchedule = async (req, res) => {
       semester,
       tag,
       subjects: subjectsWithBuilding,
+      description: description || '',
       createdBy: req.user.id,
     });
 

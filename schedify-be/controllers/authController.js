@@ -3,6 +3,9 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
+import { OAuth2Client } from 'google-auth-library';
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_WEB_CLIENT_ID);
 
 // Register a new user (student or professor only)
 // Forgot Password: send reset email
@@ -77,6 +80,7 @@ export const resetPassword = async (req, res) => {
     res.status(500).json({ message: 'Server error', error });
   }
 };
+
 export const register = async (req, res) => {
   try {
     const { name, email, password, idNo, department, course, yearLevel, block, expoPushToken } = req.body;
@@ -241,5 +245,81 @@ export const getMe = async (req, res) => {
 
   } catch (error) {
     res.status(500).json({ message: "Server error", error });
+  }
+};
+
+// Google Auth
+export const googleAuth = async (req, res) => {
+  const { idToken } = req.body;
+
+  if (!idToken) {
+    return res.status(400).json({ message: 'ID token is required' });
+  }
+
+  try {
+    // Verify Google token
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_WEB_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name, picture } = payload;
+
+    // Check if user already exists
+    let user = await User.findOne({ email });
+
+    if (user) {
+      // User exists — update googleId if not set
+      if (!user.googleId) {
+        user.googleId = googleId;
+        user.picture = picture;
+        await user.save();
+      }
+    } else {
+      // New user — create account
+      user = new User({
+        name,
+        email,
+        password: await bcrypt.hash(googleId, 10),
+        idNo: `GOOGLE-${googleId.substring(0, 8)}`,
+        role: 'student',
+        googleId,
+        picture,
+        department: '',
+        course: '',
+        yearLevel: '',
+        block: '',
+      });
+      await user.save();
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.status(200).json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        idNo: user.idNo,
+        role: user.role,
+        department: user.department,
+        course: user.course,
+        yearLevel: user.yearLevel,
+        block: user.block,
+        picture: user.picture,
+        isGoogleUser: true,
+        needsProfileCompletion: !user.department || !user.course || !user.yearLevel || !user.block,
+      }
+    });
+
+  } catch (error) {
+    res.status(401).json({ message: 'Invalid Google token', error });
   }
 };
