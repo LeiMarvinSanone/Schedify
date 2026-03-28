@@ -219,7 +219,7 @@ function AccordionSection({ type, items, onDelete, onEdit }: { type: PostType; i
                     <Text style={[acc.tagText, { color }]}>{item.tag}</Text>
                   </View>
                   {item.description && (
-                    <Text style={[acc.itemDesc, { color: descColor }]} numberOfLines={2}>
+                    <Text style={[acc.itemDesc, { color: descColor }]}> 
                       {item.description}
                     </Text>
                   )}
