@@ -17,6 +17,7 @@ export const createSchedule = async (req, res) => {
       semester,
       tag,
       subjects,
+      description,
     } = req.body;
 
     // Ensure each subject includes 'building' if provided
@@ -319,7 +320,7 @@ export const importSchedulesCSV = [
           subjects: [{
             name: row.name,
             day: row.day,
-            timeRange: row.time, // map 'time' to 'timeRange'
+            timeRange: row.time,
             room: row.room,
             building: row.building || '',
           }],
