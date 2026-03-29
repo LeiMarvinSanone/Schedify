@@ -312,19 +312,22 @@ export async function isSessionValid(): Promise<boolean> {
   return true;
 }
 
-export async function googleLogin(idToken: string): Promise<AuthResponse> {
-  const response = await apiCall<ApiResponse<AuthResponse> | AuthResponse>(
-    '/api/auth/google',
-    'POST',
-    { idToken }
+// Replaces the integrated googleLogin with a simple fetch-based version as shown in the instructions.
+export const googleLogin = async (idToken: string) => {
+  const response = await fetch(
+    "https://schedify-be.onrender.com/api/auth/google",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ idToken })
+    }
   );
 
-  const authData = extractAuthData(response);
-
-  if (authData.token) {
-    await setAuthToken(authData.token);
+  if (!response.ok) {
+    throw new Error("Google login failed");
   }
-  await setStoredUser(authData.user);
 
-  return authData;
-}
+  return response.json();
+};

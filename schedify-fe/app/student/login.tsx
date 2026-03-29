@@ -54,11 +54,14 @@ const Login = () => {
     }
   };
 
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: '117812296292-5rrntnaedq9n9uuu8somcdhcmqh01bml.apps.googleusercontent.com',
-    iosClientId: '117812296292-lcmgr0qak328sget4qf44sp7j2m9an5i.apps.googleusercontent.com',
-    webClientId: '117812296292-kv015a17t53qnrrmrvrelk1pm5lndg6f.apps.googleusercontent.com',
-  });
+  const [request, response, promptAsync] = Google.useAuthRequest(
+    {
+      androidClientId: '117812296292-5rrntnaedq9n9uuu8somcdhcmqh01bml.apps.googleusercontent.com',
+      iosClientId: '117812296292-lcmgr0qak328sget4qf44sp7j2m9an5i.apps.googleusercontent.com',
+      webClientId: '117812296292-kv015a17t53qnrrmrvrelk1pm5lndg6f.apps.googleusercontent.com',
+      redirectUri: 'com.schedify.app:/oauthredirect',
+    },
+  );
 
   React.useEffect(() => {
     if (response?.type === 'success') {
@@ -70,7 +73,7 @@ const Login = () => {
   async function handleGoogleLogin(idToken: string) {
     try {
       await googleLogin(idToken);
-      router.replace('/student/calendar' as any);
+      router.replace('/student/calendar');
     } catch {
       Alert.alert('Error', 'Google login failed.');
     }
@@ -137,7 +140,7 @@ const Login = () => {
 
       <TouchableOpacity
         style={styles.googleButton}
-        onPress={() => promptAsync()}
+        onPress={() => promptAsync({ })}
         disabled={!request}
         activeOpacity={0.8}
       >
