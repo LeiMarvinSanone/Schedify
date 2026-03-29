@@ -8,6 +8,12 @@ import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { login as apiLogin } from '../../utils/apiClient';
 import * as Notifications from 'expo-notifications';
+// --- Google Auth imports ---
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import { googleLogin } from '../../utils/apiClient';
+
+WebBrowser.maybeCompleteAuthSession();
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -47,6 +53,28 @@ const Login = () => {
       setIsLoading(false);
     }
   };
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    androidClientId: '117812296292-5rrntnaedq9n9uuu8somcdhcmqh01bml.apps.googleusercontent.com',
+    iosClientId: '117812296292-lcmgr0qak328sget4qf44sp7j2m9an5i.apps.googleusercontent.com',
+    webClientId: '117812296292-kv015a17t53qnrrmrvrelk1pm5lndg6f.apps.googleusercontent.com',
+  });
+
+  React.useEffect(() => {
+    if (response?.type === 'success') {
+      const { id_token } = response.params;
+      handleGoogleLogin(id_token);
+    }
+  }, [response]);
+
+  async function handleGoogleLogin(idToken: string) {
+    try {
+      await googleLogin(idToken);
+      router.replace('/student/calendar' as any);
+    } catch {
+      Alert.alert('Error', 'Google login failed.');
+    }
+  }
 
   return (
     <ScrollView
@@ -106,6 +134,15 @@ const Login = () => {
           <Text style={[styles.linkText, { marginTop: 8, marginBottom: 16 }]}>Forgot Password?</Text>
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity
+        style={styles.googleButton}
+        onPress={() => promptAsync()}
+        disabled={!request}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.googleButtonText}>Login with Google</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity style={[styles.button, { height: 56, minWidth: 220, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }]} disabled={isLoading} onPress={handleSubmit} activeOpacity={0.8}>
         <Text style={[styles.buttonText, { fontSize: 20, textAlign: 'center' }]}>{isLoading ? 'Logging in...' : 'Login'}</Text>
@@ -222,6 +259,22 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
     fontSize: 14,
     fontWeight: '300',
+  },
+  googleButton: {
+    backgroundColor: '#ffffff',
+    paddingVertical: 14,
+    paddingHorizontal: 60,
+    borderRadius: 8,
+    marginTop: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  googleButtonText: {
+    color: '#2d3748',
+    fontSize: 18,
+    fontWeight: '400',
+    textAlign: 'center',
   },
 });
 

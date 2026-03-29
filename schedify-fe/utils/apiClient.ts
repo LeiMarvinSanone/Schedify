@@ -125,6 +125,8 @@ async function apiCall<T>(
   }
 }
 
+export { apiCall };
+
 export interface SignupInput {
   name: string;
   email: string;
@@ -308,4 +310,21 @@ export async function isSessionValid(): Promise<boolean> {
     return false;
   }
   return true;
+}
+
+export async function googleLogin(idToken: string): Promise<AuthResponse> {
+  const response = await apiCall<ApiResponse<AuthResponse> | AuthResponse>(
+    '/api/auth/google',
+    'POST',
+    { idToken }
+  );
+
+  const authData = extractAuthData(response);
+
+  if (authData.token) {
+    await setAuthToken(authData.token);
+  }
+  await setStoredUser(authData.user);
+
+  return authData;
 }

@@ -10,7 +10,12 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.schedify.app"
+      "bundleIdentifier": "com.schedify.app",
+      "config": {
+        "googleSignIn": {
+          "reservedClientId": "117812296292-lcmgr0qak328sget4qf44sp7j2m9an5i.apps.googleusercontent.com"
+        }
+      }
     },
     "android": {
       "package": "com.schedify.app",
@@ -19,6 +24,11 @@
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "config": {
+        "googleSignIn": {
+          "certificateHash": "117812296292-5rrntnaedq9n9uuu8somcdhcmqh01bml.apps.googleusercontent.com"
+        }
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
