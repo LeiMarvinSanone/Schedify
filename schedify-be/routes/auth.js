@@ -1,5 +1,5 @@
 import express from 'express';
-import { register, login, changePassword, getMe, forgotPassword, resetPassword, googleAuth } from '../controllers/authController.js';
+import { register, login, changePassword, getMe, forgotPassword, resetPassword, googleAuth, completeProfile } from '../controllers/authController.js';
 import { verifyToken } from '../middleware/authmiddleware.js';
 import {
   validate,
@@ -32,5 +32,8 @@ router.post('/reset-password', validateResetPassword, validate, resetPassword);
 
 // Google Auth
 router.post('/google', googleAuth);
+
+// Complete profile for Google users
+router.put('/complete-profile', verifyToken, completeProfile);
 
 export default router;

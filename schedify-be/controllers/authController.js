@@ -12,7 +12,6 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_WEB_CLIENT_ID);
 export const forgotPassword = async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ message: 'Email is required' });
-  // Only allow sorsu.edu.ph or gmail.com emails
   const allowedDomains = ['@sorsu.edu.ph', '@gmail.com'];
   const isAllowed = allowedDomains.some(domain => email.endsWith(domain));
   if (!isAllowed) {
@@ -22,13 +21,11 @@ export const forgotPassword = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Generate token
     const token = crypto.randomBytes(32).toString('hex');
     user.resetPasswordToken = token;
-    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+    user.resetPasswordExpires = Date.now() + 3600000;
     await user.save();
 
-    // Configure nodemailer (example with Gmail, use env vars in production)
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -89,24 +86,20 @@ export const register = async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
-    // Check if email already exists
     const existingEmail = await User.findOne({ email });
     if (existingEmail) return res.status(400).json({ message: "Email already exists" });
 
-    // Check if idNo already exists
     const existingId = await User.findOne({ idNo });
     if (existingId) return res.status(400).json({ message: "ID number already exists" });
 
-    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new user — role is NOT accepted from frontend, defaults to 'student'
     const newUser = new User({
       name,
       email,
       password: hashedPassword,
       idNo,
-      role: 'student', // always student on public register
+      role: 'student',
       department,
       course,
       yearLevel,
@@ -147,21 +140,17 @@ export const login = async (req, res) => {
   try {
     const { email, password, expoPushToken } = req.body;
 
-    // Find user by email
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Check password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
-    // Save expoPushToken if provided
     if (expoPushToken) {
       user.expoPushToken = expoPushToken;
       await user.save();
     }
 
-    // Role is taken from database, not from request
     const token = jwt.sign(
       { id: user._id, role: user.role },
       process.env.JWT_SECRET,
@@ -257,7 +246,6 @@ export const googleAuth = async (req, res) => {
   }
 
   try {
-    // Verify Google token
     const ticket = await googleClient.verifyIdToken({
       idToken,
       audience: process.env.GOOGLE_WEB_CLIENT_ID,
@@ -266,18 +254,15 @@ export const googleAuth = async (req, res) => {
     const payload = ticket.getPayload();
     const { sub: googleId, email, name, picture } = payload;
 
-    // Check if user already exists
     let user = await User.findOne({ email });
 
     if (user) {
-      // User exists — update googleId if not set
       if (!user.googleId) {
         user.googleId = googleId;
         user.picture = picture;
         await user.save();
       }
     } else {
-      // New user — create account
       user = new User({
         name,
         email,
@@ -294,7 +279,6 @@ export const googleAuth = async (req, res) => {
       await user.save();
     }
 
-    // Generate JWT token
     const token = jwt.sign(
       { id: user._id, role: user.role },
       process.env.JWT_SECRET,
@@ -321,5 +305,36 @@ export const googleAuth = async (req, res) => {
 
   } catch (error) {
     res.status(401).json({ message: 'Invalid Google token', error });
+  }
+};
+
+// Complete profile for Google users
+export const completeProfile = async (req, res) => {
+  try {
+    const { idNo, department, course, yearLevel, block } = req.body;
+
+    if (!idNo || !department || !course || !yearLevel || !block) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    const existingId = await User.findOne({ idNo, _id: { $ne: req.user.id } });
+    if (existingId) {
+      return res.status(400).json({ message: 'ID number already exists' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { idNo, department, course, yearLevel, block },
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json({ message: 'Profile completed successfully', user });
+
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error });
   }
 };
