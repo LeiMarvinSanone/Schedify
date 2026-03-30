@@ -6,7 +6,7 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { login as apiLogin, googleLogin } from '../../utils/apiClient';
-import * as Notifications from 'expo-notifications';
+import { registerForPushNotificationsAsync } from '../../utils/notifications';
 import {
   GoogleSignin,
   statusCodes,
@@ -41,14 +41,13 @@ const Login = () => {
 
     try {
       setIsLoading(true);
-      let expoPushToken = undefined;
-      try {
-        const { data } = await Notifications.getExpoPushTokenAsync();
-        expoPushToken = data;
-      } catch (e) {
-        expoPushToken = undefined;
-      }
-      await apiLogin(formData.email, formData.password, undefined, expoPushToken);
+      const expoPushToken = await registerForPushNotificationsAsync();
+      await apiLogin(
+        formData.email,
+        formData.password,
+        undefined,
+        expoPushToken === null ? undefined : expoPushToken
+      );
       router.replace('/student/calendar' as any);
     } catch {
       Alert.alert('Error', 'Login failed. Invalid email or password.');

@@ -331,3 +331,26 @@ export const completeProfile = async (req, res) => {
     res.status(500).json({ message: 'Server error', error });
   }
 };
+
+// Update Expo Push Token for logged-in user
+export const updatePushToken = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { expoPushToken } = req.body;
+    if (!expoPushToken) {
+      return res.status(400).json({ message: 'expoPushToken is required' });
+    }
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { expoPushToken },
+      { new: true }
+    );
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.status(200).json({ message: 'Expo push token updated successfully' });
+  } catch (error) {
+    console.error('updatePushToken error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
