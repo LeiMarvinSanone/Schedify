@@ -7,6 +7,15 @@ import { OAuth2Client } from 'google-auth-library';
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_WEB_CLIENT_ID);
 
+// Move transporter outside function (good practice)
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
 // Register a new user (student or professor only)
 // Forgot Password: send reset email
 export const forgotPassword = async (req, res) => {
@@ -26,14 +35,6 @@ export const forgotPassword = async (req, res) => {
     user.resetPasswordExpires = Date.now() + 3600000;
     await user.save();
 
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}&email=${email}`;
     const mailOptions = {
       to: user.email,
@@ -45,7 +46,8 @@ export const forgotPassword = async (req, res) => {
     await transporter.sendMail(mailOptions);
     res.status(200).json({ message: 'Password reset email sent' });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error });
+    console.error('forgotPassword error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
@@ -74,7 +76,8 @@ export const resetPassword = async (req, res) => {
 
     res.status(200).json({ message: 'Password has been reset successfully' });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error });
+    console.error('resetPassword error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
@@ -293,7 +296,8 @@ export const googleAuth = async (req, res) => {
     });
 
   } catch (error) {
-    res.status(401).json({ message: 'Invalid Google token', error });
+    console.error('googleAuth error:', error);
+    res.status(401).json({ message: 'Invalid Google token', error: error.message });
   }
 };
 
