@@ -4,22 +4,26 @@ import {
   StyleSheet, Alert, ScrollView, StatusBar, Image,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
-import { login as apiLogin } from '../../utils/apiClient';
+import { login as apiLogin, googleLogin } from '../../utils/apiClient';
 import * as Notifications from 'expo-notifications';
-// --- Google Auth imports ---
-import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
-import { googleLogin } from '../../utils/apiClient';
-
-WebBrowser.maybeCompleteAuthSession();
+import {
+  GoogleSignin,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Configure Google Sign-In once on mount
+  React.useEffect(() => {
+    GoogleSignin.configure({
+      webClientId: '117812296292-kv015a17t53qnrrmrvrelk1pm5lndg6f.apps.googleusercontent.com',
+    });
+  }, []);
 
   const handleChange = (name: string, value: string) => {
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -37,7 +41,6 @@ const Login = () => {
 
     try {
       setIsLoading(true);
-      // Get Expo push token
       let expoPushToken = undefined;
       try {
         const { data } = await Notifications.getExpoPushTokenAsync();
@@ -54,28 +57,44 @@ const Login = () => {
     }
   };
 
-  const [request, response, promptAsync] = Google.useAuthRequest(
-    {
-      androidClientId: '117812296292-5rrntnaedq9n9uuu8somcdhcmqh01bml.apps.googleusercontent.com',
-      iosClientId: '117812296292-lcmgr0qak328sget4qf44sp7j2m9an5i.apps.googleusercontent.com',
-      webClientId: '117812296292-kv015a17t53qnrrmrvrelk1pm5lndg6f.apps.googleusercontent.com',
-      redirectUri: 'com.schedify.app:/oauthredirect',
-    },
-  );
-
-  React.useEffect(() => {
-    if (response?.type === 'success') {
-      const { id_token } = response.params;
-      handleGoogleLogin(id_token);
-    }
-  }, [response]);
-
-  async function handleGoogleLogin(idToken: string) {
+  // Google Sign-In handler
+  async function handleGoogleSignIn() {
     try {
-      await googleLogin(idToken);
-      router.replace('/student/calendar');
-    } catch {
-      Alert.alert('Error', 'Google login failed.');
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+      const idToken = userInfo.data?.idToken;
+
+      if (!idToken) {
+        Alert.alert('Error', 'No ID token received from Google.');
+        return;
+      }
+
+      const authData = await googleLogin(idToken);
+      router.replace('/student/calendar' as any);
+
+    } catch (error: any) {
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        // user cancelled, do nothing
+        return;
+      }
+
+      // No account found — redirect to signup
+      if (error.message?.includes('No account found')) {
+        Alert.alert(
+          'No Account Found',
+          'No account is linked to this Google email. Please sign up first.',
+          [
+            { 
+              text: 'Sign Up', 
+              onPress: () => router.push('/student/signup' as any) 
+            },
+            { text: 'Cancel', style: 'cancel' }
+          ]
+        );
+        return;
+      }
+
+      Alert.alert('Error', 'Google login failed. Please try again.');
     }
   }
 
@@ -93,9 +112,7 @@ const Login = () => {
       />
 
       <Text style={styles.appName}>
-        <Text style={styles.appNameNormal}>Sch</Text>
-        <Text style={styles.appNameNormal}>e</Text>
-        <Text style={styles.appNameNormal}>dify</Text>
+        <Text style={styles.appNameNormal}>Schedify</Text>
       </Text>
 
       <View style={styles.formGroup}>
@@ -123,38 +140,59 @@ const Login = () => {
             placeholderTextColor="#a0aec0"
             secureTextEntry={!showPassword}
           />
-          <TouchableOpacity onPress={() => setShowPassword(prev => !prev)} style={styles.eyeButton}>
-            <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#cbd5e0" />
+          <TouchableOpacity 
+            onPress={() => setShowPassword(prev => !prev)} 
+            style={styles.eyeButton}
+          >
+            <Ionicons 
+              name={showPassword ? 'eye-off' : 'eye'} 
+              size={20} 
+              color="#cbd5e0" 
+            />
           </TouchableOpacity>
         </View>
         {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
       </View>
 
-
-      {/* Forgot Password link below password field */}
       <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'flex-end' }}>
         <TouchableOpacity onPress={() => router.push('/student/forgot-password' as any)}>
-          <Text style={[styles.linkText, { marginTop: 8, marginBottom: 16 }]}>Forgot Password?</Text>
+          <Text style={[styles.linkText, { marginTop: 8, marginBottom: 16 }]}>
+            Forgot Password?
+          </Text>
         </TouchableOpacity>
       </View>
 
+      {/* Google Login Button */}
       <TouchableOpacity
         style={styles.googleButton}
-        onPress={() => promptAsync({ })}
-        disabled={!request}
+        onPress={handleGoogleSignIn}
         activeOpacity={0.8}
       >
         <Text style={styles.googleButtonText}>Login with Google</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={[styles.button, { height: 56, minWidth: 220, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }]} disabled={isLoading} onPress={handleSubmit} activeOpacity={0.8}>
-        <Text style={[styles.buttonText, { fontSize: 20, textAlign: 'center' }]}>{isLoading ? 'Logging in...' : 'Login'}</Text>
+      {/* Email/Password Login Button */}
+      <TouchableOpacity
+        style={styles.button}
+        disabled={isLoading}
+        onPress={handleSubmit}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.buttonText}>
+          {isLoading ? 'Logging in...' : 'Login'}
+        </Text>
       </TouchableOpacity>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-        <Text style={{ color: '#a0aec0', fontSize: 15 }}>Don&apos;t have an account? </Text>
+        <Text style={{ color: '#a0aec0', fontSize: 15 }}>
+          Don&apos;t have an account?{' '}
+        </Text>
         <TouchableOpacity onPress={() => router.push('/student/signup' as any)}>
-          <Text style={[styles.linkText, { fontSize: 15, fontWeight: 'bold', color: '#68d391' }]}>Sign up</Text>
+          <Text style={[styles.linkText, { 
+            fontSize: 15, fontWeight: 'bold', color: '#68d391' 
+          }]}>
+            Sign up
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -184,10 +222,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '400',
     letterSpacing: 1,
-  },
-  appNameAccent: {
-    color: '#68d391',  
-    fontWeight: '400',
   },
   formGroup: {
     width: '100%',
@@ -234,28 +268,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 4,
   },
-  pickerWrapper: {
-    backgroundColor: '#5a6778',
-    borderRadius: 8,
-    paddingHorizontal: 4,
-  },
-  picker: {
-    color: '#ffffff',
-    backgroundColor: 'transparent',
-    height: 52,
-  },
   button: {
     backgroundColor: '#4a5568',
     paddingVertical: 14,
     paddingHorizontal: 60,
-    borderRadius: 8,
+    borderRadius: 12,
     marginTop: 24,
     marginBottom: 16,
+    height: 56,
+    minWidth: 220,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   buttonText: {
     color: '#e2e8f0',
-    fontSize: 18,
-    fontWeight: '400',
+    fontSize: 20,
+    textAlign: 'center',
   },
   linkText: {
     color: '#e2e8f0',
@@ -269,9 +297,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 60,
     borderRadius: 8,
     marginTop: 12,
-    marginBottom: 16,
+    marginBottom: 8,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    width: '100%',
+    alignItems: 'center',
   },
   googleButtonText: {
     color: '#2d3748',

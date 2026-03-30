@@ -1,3 +1,31 @@
+// Google Login API
+export const googleLogin = async (idToken: string): Promise<AuthResponse> => {
+  const response = await fetch(
+    "https://schedify-be.onrender.com/api/auth/google",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken })
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || "Google login failed");
+  }
+
+  const raw = await response.json();
+  const authData = extractAuthData(raw);
+
+  if (authData.token) {
+    await setAuthToken(authData.token);
+  }
+  if (authData.user) {
+    await setStoredUser(authData.user);
+  }
+
+  return authData;
+};
 // Reset Password API
 export async function resetPassword(email: string, token: string, newPassword: string) {
   return await apiCall<{ message: string }>('/api/auth/reset-password', 'POST', { email, token, newPassword });
@@ -312,22 +340,3 @@ export async function isSessionValid(): Promise<boolean> {
   return true;
 }
 
-// Replaces the integrated googleLogin with a simple fetch-based version as shown in the instructions.
-export const googleLogin = async (idToken: string) => {
-  const response = await fetch(
-    "https://schedify-be.onrender.com/api/auth/google",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ idToken })
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error("Google login failed");
-  }
-
-  return response.json();
-};

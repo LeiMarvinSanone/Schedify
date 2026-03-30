@@ -252,30 +252,21 @@ export const googleAuth = async (req, res) => {
     });
 
     const payload = ticket.getPayload();
-    const { sub: googleId, email, name, picture } = payload;
+    const { sub: googleId, email, picture } = payload;
 
-    let user = await User.findOne({ email });
+    // ONLY find existing user — never create new
+    const user = await User.findOne({ email });
 
-    if (user) {
-      if (!user.googleId) {
-        user.googleId = googleId;
-        user.picture = picture;
-        await user.save();
-      }
-    } else {
-      user = new User({
-        name,
-        email,
-        password: await bcrypt.hash(googleId, 10),
-        idNo: `GOOGLE-${googleId.substring(0, 8)}`,
-        role: 'student',
-        googleId,
-        picture,
-        department: '',
-        course: '',
-        yearLevel: '',
-        block: '',
+    if (!user) {
+      return res.status(404).json({ 
+        message: 'No account found with this Google email. Please sign up first.' 
       });
+    }
+
+    // Save googleId if first time using Google login
+    if (!user.googleId) {
+      user.googleId = googleId;
+      user.picture = picture;
       await user.save();
     }
 
@@ -298,8 +289,6 @@ export const googleAuth = async (req, res) => {
         yearLevel: user.yearLevel,
         block: user.block,
         picture: user.picture,
-        isGoogleUser: true,
-        needsProfileCompletion: !user.department || !user.course || !user.yearLevel || !user.block,
       }
     });
 
