@@ -8,8 +8,6 @@ import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { signup as apiSignup } from '../../utils/apiClient';
 
-type Role = 'Student' | 'Professor';
-
 const COURSES: Record<string, string[]> = {
   CICT: ['BSIT', 'BSCS', 'BSIS', 'BTVTED'],
   CBME: ['BSA', 'BSAIS', 'BSE', 'BPA'],
@@ -30,7 +28,7 @@ const SignUp = () => {
     yearLevel: '',
     block: '',
   });
-  const [role, setRole] = useState<Role>('Student');
+  // Removed role state
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -73,7 +71,7 @@ const SignUp = () => {
         course: course.trim(),
         yearLevel: yearLevel.trim(),
         block: block.trim(),
-        role,
+        // role removed
       });
       setErrors({});
       Alert.alert('Success', 'Account created!', [
@@ -254,24 +252,7 @@ const SignUp = () => {
           </View>
         </View>
 
-        <View style={styles.roleRow}>
-          <View style={styles.roleTag}>
-            <Text style={styles.roleTagText}>Role</Text>
-          </View>
-          {(['Student', 'Professor'] as Role[]).map(r => (
-            <TouchableOpacity
-              key={r}
-              style={styles.roleOption}
-              onPress={() => setRole(r)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.radioOuter, role === r && styles.radioOuterActive]}>
-                {role === r && <View style={styles.radioInner} />}
-              </View>
-              <Text style={[styles.roleText, role === r && styles.roleTextActive]}>{r}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+
 
         <TouchableOpacity style={styles.button} onPress={handleSubmit} activeOpacity={0.85} disabled={isLoading}>
           <Text style={styles.buttonText}>{isLoading ? 'Creating account...' : 'Sign up'}</Text>

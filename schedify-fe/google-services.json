@@ -2,32 +2,44 @@
   "project_info": {
     "project_number": "117812296292",
     "project_id": "schedify-491613",
-    "storage_bucket": ""
+    "storage_bucket": "schedify-491613.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:117812296292:android:5rrntnaedq9n9uuu8somcdhcmqh01bml.apps.googleusercontent.com",
+        "mobilesdk_app_id": "1:117812296292:android:7137e3c59b1c7c253cfd71",
         "android_client_info": {
           "package_name": "com.schedify.app"
         }
       },
       "oauth_client": [
         {
-          "client_id": "117812296292-5rrntnaedq9n9uuu8somcdhcmqh01bml.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.schedify.app",
-            "certificate_hash": "95CE13547B037AAB18ED3834FE665095:3BCA18AD"
-          }
-        },
-        {
           "client_id": "117812296292-kv015a17t53qnrrmrvrelk1pm5lndg6f.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
-      "api_key": [],
-      "services": {}
+      "api_key": [
+        {
+          "current_key": "AIzaSyD9SsMsdrXODrzKC0EZ9YNUWgKnMoA3mZ0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "117812296292-kv015a17t53qnrrmrvrelk1pm5lndg6f.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "117812296292-lcmgr0qak328sget4qf44sp7j2m9an5i.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.schedify.app"
+              }
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"

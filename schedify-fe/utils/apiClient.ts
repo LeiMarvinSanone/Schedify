@@ -164,7 +164,7 @@ export interface SignupInput {
   course: string;
   yearLevel: string;
   block: string;
-  role: string;
+  role?: string;
 }
 
 export interface AuthResponse {

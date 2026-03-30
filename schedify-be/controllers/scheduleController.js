@@ -203,7 +203,7 @@ export const updateSchedule = async (req, res) => {
 
     const updated = await Schedule.findByIdAndUpdate(
       req.params.id,
-      updateBody,
+      { $set: updateBody },
       { returnDocument: 'after' }
     );
 
