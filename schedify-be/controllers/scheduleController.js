@@ -188,20 +188,17 @@ export const updateSchedule = async (req, res) => {
       }));
     }
 
-    // Recalculate tag if department, course, yearLevel, or block are changed (unless tag is explicitly set)
-    const { department, course, yearLevel, block, tag } = updateBody;
-    if (!tag || tag === '' || tag === undefined) {
-      // Only recalculate if not set to 'whole-university'
-      if (
-        department === 'whole-university' ||
-        department === 'Whole University'
-      ) {
-        updateBody.tag = 'whole-university';
-      } else {
-        // Build tag from fields if any are present
-        const tagParts = [course, yearLevel, block].filter(Boolean);
-        updateBody.tag = tagParts.length > 0 ? tagParts.join(' ') : '';
-      }
+    // Always recalculate tag to match frontend logic
+    const { department, course, yearLevel, block } = updateBody;
+    if (
+      department === 'whole-university' ||
+      department === 'Whole University'
+    ) {
+      updateBody.tag = 'whole-university';
+    } else {
+      // Build tag from fields, including department for consistency
+      const tagParts = [department, course, yearLevel, block].filter(Boolean);
+      updateBody.tag = tagParts.length > 0 ? tagParts.join(' ') : '';
     }
 
     const updated = await Schedule.findByIdAndUpdate(

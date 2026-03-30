@@ -462,15 +462,16 @@ export default function SchedulesScreen() {
       if (editForm.department === 'Whole University') {
         tagToSend = 'whole-university';
       } else {
-        const tagParts = [editForm.course, editForm.yearLevel, editForm.block].filter(Boolean);
+        // Include department in tag for correct visibility
+        const tagParts = [editForm.department, editForm.course, editForm.yearLevel, editForm.block].filter(Boolean);
         tagToSend = tagParts.join(' ');
       }
       const updatePayload = {
         tag: tagToSend,
         department: editForm.department || currentSchedule.department,
-        course: editForm.course || currentSchedule.course,
-        yearLevel: editForm.yearLevel || currentSchedule.yearLevel,
-        block: editForm.block || currentSchedule.block,
+        course: editForm.course !== undefined ? editForm.course : currentSchedule.course,
+        yearLevel: editForm.yearLevel !== undefined ? editForm.yearLevel : currentSchedule.yearLevel,
+        block: editForm.block !== undefined ? editForm.block : currentSchedule.block,
         subjects: nextSubjects,
         description: editForm.description,
       };
