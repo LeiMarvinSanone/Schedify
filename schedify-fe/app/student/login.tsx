@@ -140,7 +140,7 @@ const Login = () => {
 
       <TouchableOpacity
         style={styles.googleButton}
-        onPress={() => promptAsync({ })}
+        onPress={() => promptAsync({ useProxy: false })}
         disabled={!request}
         activeOpacity={0.8}
       >
