@@ -1,5 +1,5 @@
 import express from 'express';
-import { register, login, changePassword, getMe, forgotPassword, resetPassword, googleAuth, completeProfile } from '../controllers/authController.js';
+import { register, login, changePassword, getMe, forgotPassword, resetPassword, googleAuth, completeProfile, updatePushToken } from '../controllers/authController.js';
 import { verifyToken } from '../middleware/authmiddleware.js';
 import {
   validate,
@@ -35,5 +35,8 @@ router.post('/google', googleAuth);
 
 // Complete profile for Google users
 router.put('/complete-profile', verifyToken, completeProfile);
+
+// Update Expo Push Token
+router.put('/update-push-token', verifyToken, updatePushToken);
 
 export default router;

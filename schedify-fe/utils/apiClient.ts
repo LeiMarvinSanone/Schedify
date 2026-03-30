@@ -34,6 +34,14 @@ export async function resetPassword(email: string, token: string, newPassword: s
 export async function forgotPassword(email: string) {
   return await apiCall<{ message: string }>('/api/auth/forgot-password', 'POST', { email });
 }
+// Update Expo Push Token for logged-in user
+export async function updatePushToken(token: string): Promise<void> {
+  await apiCall<{ message: string }>(
+    '/api/auth/update-push-token',
+    'PUT',
+    { expoPushToken: token }
+  );
+}
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const BASE_URL = 'https://schedify-be.onrender.com';
