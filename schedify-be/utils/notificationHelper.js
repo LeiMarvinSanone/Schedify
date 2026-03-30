@@ -3,12 +3,14 @@ import { Expo } from 'expo-server-sdk';
 const expo = new Expo();
 
 export const sendPushNotifications = async (tokens, title, body) => {
-  // Filter valid tokens
+
   const validTokens = tokens.filter(token => Expo.isExpoPushToken(token));
 
-  if (validTokens.length === 0) return;
+  if (validTokens.length === 0) {
+    console.log("No valid Expo push tokens found");
+    return;
+  }
 
-  // Create messages
   const messages = validTokens.map(token => ({
     to: token,
     sound: 'default',
@@ -17,13 +19,14 @@ export const sendPushNotifications = async (tokens, title, body) => {
     data: { title, body },
   }));
 
-  // Send in chunks
   const chunks = expo.chunkPushNotifications(messages);
+
   for (const chunk of chunks) {
     try {
-      await expo.sendPushNotificationsAsync(chunk);
+      const tickets = await expo.sendPushNotificationsAsync(chunk);
+      console.log("Push tickets:", tickets);
     } catch (error) {
-      console.error('Push notification error:', error);
+      console.error("Push notification error:", error);
     }
   }
 };
