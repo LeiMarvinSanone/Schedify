@@ -95,13 +95,13 @@ export default function Profile() {
   const [defaultReminder, setDefaultReminder] = useState<ReminderOption>('30m');
   const [account, setAccount] = useState<UserProfile | null>(null);
 
-  const handleLogout = async () => {
-    try {
-      await apiLogout();
-    } finally {
-      router.replace('/student/login' as any);
-    }
-  };
+ const handleLogout = async () => {
+  try {
+    await apiLogout();
+  } finally {
+    router.replace('/student/welcome' as any);  // ← change login to welcome
+  }
+};
 
   const displayName = account?.name || 'Student';
   const displayRole = account?.role || 'Student';

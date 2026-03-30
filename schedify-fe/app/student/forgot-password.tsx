@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import * as Linking from 'expo-linking';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image, StatusBar, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image, StatusBar, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { forgotPassword } from '../../utils/apiClient';
 
 
@@ -49,30 +50,36 @@ const ForgotPassword = () => {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      <StatusBar barStyle="light-content" backgroundColor="#2d3748" />
-      <Image
-        source={require('../../assets/images/logo.png')}
-        style={styles.logo}
-        resizeMode="contain"
-      />
-      <Text style={styles.appName}>Schedify</Text>
-      <Text style={styles.title}>Forgot Password</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Enter your email"
-        placeholderTextColor="#a0aec0"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-      />
-      <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.button} onPress={handleForgotPassword} disabled={loading}>
-          <Text style={styles.buttonText}>{loading ? 'Sending...' : 'Send Reset Link'}</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+    >
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <StatusBar barStyle="light-content" backgroundColor="#2d3748" />
+        <Image
+          source={require('../../assets/images/logo.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+        <Text style={styles.appName}>Schedify</Text>
+        <Text style={styles.title}>Forgot Password</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter your email"
+          placeholderTextColor="#a0aec0"
+          autoCapitalize="none"
+          keyboardType="email-address"
+          value={email}
+          onChangeText={setEmail}
+        />
+        <View style={styles.buttonRow}>
+          <TouchableOpacity style={styles.button} onPress={handleForgotPassword} disabled={loading}>
+            <Text style={styles.buttonText}>{loading ? 'Sending...' : 'Send Reset Link'}</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
