@@ -47,9 +47,11 @@ export default function SettingsScreen() {
         onPress: async () => {
           try {
             await apiLogout();
+            router.dismissAll();
             router.replace('/student/welcome' as any);
           } catch (error) {
             console.error('Logout error:', error);
+            router.dismissAll();
             router.replace('/student/welcome' as any);
           }
         },

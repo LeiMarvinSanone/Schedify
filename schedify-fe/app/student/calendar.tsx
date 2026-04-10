@@ -4,6 +4,7 @@ import {
   ScrollView, StatusBar, TextInput,
   Dimensions, Modal, Animated, FlatList,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../ThemeContext';
 import { ICONS } from '../../constants/icons';
 import BottomNav from '../../components/BottomNav';
@@ -792,6 +793,8 @@ const vs = StyleSheet.create({
 });
 // main
 export default function CalendarScreen() {
+
+  const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const today = new Date();
 
@@ -893,7 +896,7 @@ export default function CalendarScreen() {
     <View style={[s.screen, { backgroundColor: screenBg }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={headerBg} />
 
-      <View style={[s.header, { backgroundColor: headerBg, borderBottomColor: headerBorder }]}>
+      <View style={[s.header, { backgroundColor: headerBg, borderBottomColor: headerBorder, paddingTop: insets.top + 12 }]}>
         <View>
           <Text style={[s.title, { color: titleColor }]}>Schedify</Text>
           <Text style={[s.subtitle, { color: subtitleColor }]}>{MONTHS[month]} {year}</Text>

@@ -28,7 +28,7 @@
       },
       "config": {
         "googleSignIn": {
-          "certificateHash": "95:CE:13:54:7B:03:7A:AB:18:ED:38:34:FE:66:50:95:3B:CA:18:AD"
+          "certificateHash": "94:04:C6:DE:D0:2A:B4:E4:AC:8E:7A:9B:08:D2:D3:AE:6B:3E:8A:53"
         }
       },
       "edgeToEdgeEnabled": true,
@@ -62,8 +62,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "087b0766-864d-4b39-8659-d676649416ab"
+        "projectId": "f39023b4-a3f5-4362-9233-88948af5113a"
       }
-    }
+    },
+    "owner": "schedify-app"
   }
 }

@@ -21,6 +21,7 @@ import {
   getCurrentUser,
   logout as apiLogout,
 } from '../../utils/apiClient';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 interface UserProfile {
   id?: string;
@@ -97,11 +98,22 @@ export default function Profile() {
 
  const handleLogout = async () => {
   try {
+    // Clear Google cache first
+    const isSignedInWithGoogle = await GoogleSignin.getCurrentUser();
+    if (isSignedInWithGoogle) {
+      // Clear cached access token if available
+      if (isSignedInWithGoogle.idToken) {
+        await GoogleSignin.clearCachedAccessToken(isSignedInWithGoogle.idToken);
+      }
+      await GoogleSignin.signOut();
+    }
+    // Then clear app token
     await apiLogout();
   } finally {
-    router.replace('/student/welcome' as any);  // ← change login to welcome
+    router.dismissAll();
+    router.replace('/student/welcome' as any);
   }
-};
+ };
 
   const displayName = account?.name || 'Student';
   const displayRole = account?.role || 'Student';

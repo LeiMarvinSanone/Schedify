@@ -518,85 +518,87 @@ export default function SchedulesScreen() {
         />
         <View style={[styles.modalContent, { backgroundColor: theme.card }]}> 
           <Text style={[styles.modalTitle, { color: theme.title }]}>Edit Schedule</Text>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Title</Text>
+            <TextInput
+              style={[styles.modalInput, { backgroundColor: theme.input, color: theme.text, borderColor: theme.divider }]}
+              value={editForm.title}
+              onChangeText={text => setEditForm(prev => ({ ...prev, title: text }))}
+              placeholder="Enter title"
+              placeholderTextColor={theme.muted}
+            />
 
-          <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Title</Text>
-          <TextInput
-            style={[styles.modalInput, { backgroundColor: theme.input, color: theme.text, borderColor: theme.divider }]}
-            value={editForm.title}
-            onChangeText={text => setEditForm(prev => ({ ...prev, title: text }))}
-            placeholder="Enter title"
-            placeholderTextColor={theme.muted}
-          />
+            {editingItem && editingItem.scheduleType !== 'Class Schedules' && (
+              <>
+                <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Date</Text>
+                <TextInput
+                  style={[styles.modalInput, { backgroundColor: theme.input, color: theme.text, borderColor: theme.divider }]}
+                  value={editForm.date}
+                  onChangeText={text => setEditForm(prev => ({ ...prev, date: text }))}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={theme.muted}
+                />
+              </>
+            )}
 
-          {/* Only show date field for Events and Suspensions */}
-          {editingItem && editingItem.scheduleType !== 'Class Schedules' && (
-            <>
-              <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Date</Text>
-              <TextInput
-                style={[styles.modalInput, { backgroundColor: theme.input, color: theme.text, borderColor: theme.divider }]}
-                value={editForm.date}
-                onChangeText={text => setEditForm(prev => ({ ...prev, date: text }))}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={theme.muted}
-              />
-            </>
-          )}
+            <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Tag (Department/Group)</Text>
+            <Dropdown
+              value={editForm.department || ''}
+              options={DEPARTMENTS}
+              onSelect={val => setEditForm(prev => ({ ...prev, department: val, course: '', block: '', yearLevel: '' }))}
+              placeholder="Select department"
+            />
+            <Dropdown
+              value={editForm.course || ''}
+              options={editForm.department ? COURSES[editForm.department] : []}
+              onSelect={val => setEditForm(prev => ({ ...prev, course: val }))}
+              placeholder="Select course"
+            />
+            <Dropdown
+              value={editForm.block || ''}
+              options={BLOCKS}
+              onSelect={val => setEditForm(prev => ({ ...prev, block: val }))}
+              placeholder="Select block"
+            />
+            <Dropdown
+              value={editForm.yearLevel || ''}
+              options={["1st Year", "2nd Year", "3rd Year", "4th Year"]}
+              onSelect={val => setEditForm(prev => ({ ...prev, yearLevel: val }))}
+              placeholder="Select year level"
+            />
 
-          <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Tag (Department/Group)</Text>
-          <Dropdown
-            value={editForm.department || ''}
-            options={DEPARTMENTS}
-            onSelect={val => setEditForm(prev => ({ ...prev, department: val, course: '', block: '', yearLevel: '' }))}
-            placeholder="Select department"
-          />
-          <Dropdown
-            value={editForm.course || ''}
-            options={editForm.department ? COURSES[editForm.department] : []}
-            onSelect={val => setEditForm(prev => ({ ...prev, course: val }))}
-            placeholder="Select course"
-          />
-          <Dropdown
-            value={editForm.block || ''}
-            options={BLOCKS}
-            onSelect={val => setEditForm(prev => ({ ...prev, block: val }))}
-            placeholder="Select block"
-          />
-          <Dropdown
-            value={editForm.yearLevel || ''}
-            options={["1st Year", "2nd Year", "3rd Year", "4th Year"]}
-            onSelect={val => setEditForm(prev => ({ ...prev, yearLevel: val }))}
-            placeholder="Select year level"
-          />
+            <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Time</Text>
+            <TextInput
+              style={[styles.modalInput, { backgroundColor: theme.input, color: theme.text, borderColor: theme.divider }]}
+              value={editForm.time}
+              onChangeText={text => setEditForm(prev => ({ ...prev, time: text }))}
+              placeholder="e.g., 10:00 AM - 12:00 PM"
+              placeholderTextColor={theme.muted}
+            />
 
-          <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Time</Text>
-          <TextInput
-            style={[styles.modalInput, { backgroundColor: theme.input, color: theme.text, borderColor: theme.divider }]}
-            value={editForm.time}
-            onChangeText={text => setEditForm(prev => ({ ...prev, time: text }))}
-            placeholder="e.g., 10:00 AM - 12:00 PM"
-            placeholderTextColor={theme.muted}
-          />
+            <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Room</Text>
+            <TextInput
+              style={[styles.modalInput, { backgroundColor: theme.input, color: theme.text, borderColor: theme.divider }]}
+              value={editForm.room}
+              onChangeText={text => setEditForm(prev => ({ ...prev, room: text }))}
+              placeholder="e.g., Room 101"
+              placeholderTextColor={theme.muted}
+            />
 
-          <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Room</Text>
-          <TextInput
-            style={[styles.modalInput, { backgroundColor: theme.input, color: theme.text, borderColor: theme.divider }]}
-            value={editForm.room}
-            onChangeText={text => setEditForm(prev => ({ ...prev, room: text }))}
-            placeholder="e.g., Room 101"
-            placeholderTextColor={theme.muted}
-          />
-
-          <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Description</Text>
-          <TextInput
-            style={[styles.modalInput, styles.modalTextArea, { backgroundColor: theme.input, color: theme.text, borderColor: theme.divider }]}
-            value={editForm.description}
-            onChangeText={text => setEditForm(prev => ({ ...prev, description: text }))}
-            placeholder="Enter description"
-            placeholderTextColor={theme.muted}
-            multiline
-            numberOfLines={3}
-          />
-
+            <Text style={[styles.modalLabel, { color: theme.subtitle }]}>Description</Text>
+            <TextInput
+              style={[styles.modalInput, styles.modalTextArea, { backgroundColor: theme.input, color: theme.text, borderColor: theme.divider }]}
+              value={editForm.description}
+              onChangeText={text => setEditForm(prev => ({ ...prev, description: text }))}
+              placeholder="Enter description"
+              placeholderTextColor={theme.muted}
+              multiline
+              numberOfLines={3}
+            />
+          </ScrollView>
           <View style={styles.modalActions}>
             <TouchableOpacity
               style={[styles.modalBtn, styles.modalBtnCancel, { backgroundColor: theme.muted + '30' }]}
@@ -635,6 +637,7 @@ const styles = StyleSheet.create({
     top: '15%',
     left: 20,
     right: 20,
+    maxHeight: '75%', // ← ADD THIS LINE ONLY
     borderRadius: 16,
     padding: 20,
     elevation: 10,
