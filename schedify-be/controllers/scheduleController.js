@@ -48,15 +48,13 @@ export const createSchedule = async (req, res) => {
 
     // Send push notifications to relevant users
     let query = {};
-    if (tag === 'whole-university') {
+    if (!tag || tag === 'whole-university') {
       query = {};
     } else {
       query = {
-        $or: [
-          { department },
-          { course },
-          { block },
-        ]
+        ...(course ? { course } : {}),
+        ...(block ? { block } : {}),
+        ...(yearLevel ? { yearLevel } : {}),
       };
     }
 
@@ -67,10 +65,12 @@ export const createSchedule = async (req, res) => {
 
     const tokens = users.map(u => u.expoPushToken).filter(Boolean);
 
+    const now = new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' });
+
     await sendPushNotifications(
       tokens,
       `New ${type}`,
-      `A new ${type.toLowerCase()} has been posted for you!`
+      `A new ${type.toLowerCase()} has been posted! (${now})`
     );
 
     res.status(201).json({ message: "Schedule created successfully", schedule: newSchedule });
@@ -120,14 +120,6 @@ export const getSchedules = async (req, res) => {
     // Build student's composite tag (case-insensitive, e.g. "bscs 3rd year block b")
     const userTag = [user.course, user.yearLevel, user.block].filter(Boolean).join(' ').trim().toLowerCase();
 
-    // A schedule is visible to a student if ANY of these are true:
-    //   1. Tag is 'whole-university' (visible to everyone)
-    //   2. Tag matches the student's composite tag (case-insensitive) — tag match alone is sufficient
-    //   3. Schedule has no tag at all — fall back to field-by-field matching
-    //
-    // NOTE: When a tag is present and matches, we do NOT also require individual
-    // field equality. That double-check causes silent exclusions when field values
-    // differ by casing or spacing between the schedule and the student's profile.
     const audienceFilter = {
       $or: [
         // Rule 1: whole-university schedules are visible to all students
@@ -287,7 +279,6 @@ export const importSchedulesCSV = [
     fs.createReadStream(req.file.path)
       .pipe(parse({ columns: true, trim: true }))
       .on('data', (row) => {
-        // Accept 'time' as the CSV column and map to 'timeRange'
         const requiredFields = ['name', 'day', 'time', 'room', 'department', 'tag'];
         for (const field of requiredFields) {
           if (!row[field] || typeof row[field] !== 'string' || row[field].trim() === '') {
