@@ -60,6 +60,7 @@ const Login = () => {
   async function handleGoogleSignIn() {
     try {
       await GoogleSignin.hasPlayServices();
+      await GoogleSignin.signOut();
       const userInfo = await GoogleSignin.signIn();
       const idToken = userInfo.data?.idToken;
 
