@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Alert, ScrollView, StatusBar, Image,
+  StyleSheet, Alert, ScrollView, StatusBar, Image, useColorScheme,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Picker } from '@react-native-picker/picker';
@@ -18,6 +18,9 @@ const YEAR_LEVELS = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
 const BLOCKS = ['Block A', 'Block B', 'Block C', 'Block D'];
 
 const SignUp = () => {
+  const colorScheme = useColorScheme();
+  const itemColor = colorScheme === 'dark' ? '#ffffff' : '#1a1a1a';
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -185,9 +188,9 @@ const SignUp = () => {
                 style={styles.picker}
                 dropdownIconColor="#8a9bb0"
               >
-                <Picker.Item label="Select Department" value="" color="#999" />
+                <Picker.Item label="Select Department" value="" color={itemColor} />
                 {DEPARTMENTS.map(d => (
-                  <Picker.Item key={d} label={d} value={d} color="#333" />
+                  <Picker.Item key={d} label={d} value={d} color={itemColor} />
                 ))}
               </Picker>
             </View>
@@ -204,9 +207,9 @@ const SignUp = () => {
                 dropdownIconColor="#8a9bb0"
                 enabled={!!formData.department}
               >
-                <Picker.Item label="Select Course" value="" color="#999" />
+                <Picker.Item label="Select Course" value="" color={itemColor} />
                 {(COURSES[formData.department] || []).map(c => (
-                  <Picker.Item key={c} label={c} value={c} color="#333" />
+                  <Picker.Item key={c} label={c} value={c} color={itemColor} />
                 ))}
               </Picker>
             </View>
@@ -225,9 +228,9 @@ const SignUp = () => {
                 dropdownIconColor="#8a9bb0"
                  enabled={!!formData.course}
               >
-                <Picker.Item label="Select Year Level" value="" color="#999" />
+                <Picker.Item label="Select Year Level" value="" color={itemColor} />
                 {YEAR_LEVELS.map(y => (
-                  <Picker.Item key={y} label={y} value={y} color="#333" />
+                  <Picker.Item key={y} label={y} value={y} color={itemColor} />
                 ))}
               </Picker>
             </View>
@@ -244,9 +247,9 @@ const SignUp = () => {
                 dropdownIconColor="#8a9bb0"
                  enabled={!!formData.yearLevel}
               >
-                <Picker.Item label="Select Block" value="" color="#999" />
+                <Picker.Item label="Select Block" value="" color={itemColor} />
                 {BLOCKS.map(b => (
-                  <Picker.Item key={b} label={b} value={b} color="#333" />
+                  <Picker.Item key={b} label={b} value={b} color={itemColor} />
                 ))}
               </Picker>
             </View>

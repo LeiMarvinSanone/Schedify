@@ -1,11 +1,23 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  StatusBar, Image,
+  StatusBar, Image, BackHandler,
 } from 'react-native';
 import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function WelcomeScreen() {
+
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        BackHandler.exitApp();
+        return true;
+      });
+      return () => sub.remove();
+    }, [])
+  );
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#2d3748" />

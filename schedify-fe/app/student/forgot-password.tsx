@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import * as Linking from 'expo-linking';
+import { router } from 'expo-router';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image, StatusBar, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { forgotPassword } from '../../utils/apiClient';
 
@@ -10,26 +11,31 @@ const ForgotPassword = () => {
   const [token, setToken] = useState('');
   const [loading, setLoading] = useState(false);
   useEffect(() => {
-    const handleDeepLink = (event: Linking.EventType) => {
-      const url = event.url || '';
+    const handleDeepLink = (url: string) => {
       const parsed = Linking.parse(url);
-      if (parsed && parsed.path && parsed.path.startsWith('reset-password')) {
-        const { token, email } = parsed.queryParams || {};
+      if (parsed?.path?.startsWith('reset-password')) {
+        const token = parsed.queryParams?.token;
+        const email = parsed.queryParams?.email;
         if (token && email) {
-          setToken(Array.isArray(token) ? token[0] : token);
-          setEmail(Array.isArray(email) ? email[0] : email);
+          router.replace({
+            pathname: '/student/reset-password' as any,
+            params: {
+              token: Array.isArray(token) ? token[0] : token,
+              email: Array.isArray(email) ? email[0] : email,
+            },
+          });
         }
       }
     };
-    // Listen for incoming links
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-    // Check if app was opened from a link
-    (async () => {
-      const initialUrl = await Linking.getInitialURL();
-      if (initialUrl) {
-        handleDeepLink({ url: initialUrl } as any);
-      }
-    })();
+
+    const subscription = Linking.addEventListener('url', (event) => {
+      handleDeepLink(event.url);
+    });
+
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink(url);
+    });
+
     return () => subscription.remove();
   }, []);
 

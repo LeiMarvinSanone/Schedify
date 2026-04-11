@@ -110,7 +110,6 @@ export default function Profile() {
     // Then clear app token
     await apiLogout();
   } finally {
-    router.dismissAll();
     router.replace('/student/welcome' as any);
   }
  };
