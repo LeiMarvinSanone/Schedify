@@ -1,15 +1,25 @@
 // Helper: Get next date for a given day of week (e.g., 'Monday')
+// AFTER — uses LOCAL date, correct for any timezone
 function getNextDateForDay(day: string): string {
   const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   const today = new Date();
   const todayIdx = today.getDay();
   const targetIdx = daysOfWeek.indexOf(day.toLowerCase());
-  if (targetIdx === -1) return today.toISOString().split('T')[0];
-  let diff = targetIdx - todayIdx;
-  if (diff < 0) diff += 7;
+
   const nextDate = new Date(today);
-  nextDate.setDate(today.getDate() + diff);
-  return nextDate.toISOString().split('T')[0];
+  if (targetIdx === -1) {
+    // fallback: return today's LOCAL date
+  } else {
+    let diff = targetIdx - todayIdx;
+    if (diff < 0) diff += 7;
+    nextDate.setDate(today.getDate() + diff);
+  }
+
+  // FIX: build date string from LOCAL fields, not toISOString()
+  const y = nextDate.getFullYear();
+  const m = String(nextDate.getMonth() + 1).padStart(2, '0');
+  const d = String(nextDate.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 import { 
   getSchedules as apiGetSchedules, 

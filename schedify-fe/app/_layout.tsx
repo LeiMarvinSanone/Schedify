@@ -7,6 +7,7 @@ import { useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { registerForPushNotificationsAsync } from '../utils/notifications';
 import { updatePushToken } from '../utils/apiClient';
+import { registerBackgroundSync } from '../utils/backgroundSync';
 
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
@@ -36,6 +37,7 @@ export default function RootLayout() {
           console.error('Failed to update push token:', e);
         }
       }
+        await registerBackgroundSync(); 
     };
     setupNotifications();
 

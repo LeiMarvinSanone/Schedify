@@ -156,7 +156,7 @@ const SignUp = () => {
             secureTextEntry={!showPassword}
           />
           <TouchableOpacity onPress={() => setShowPassword(prev => !prev)} style={styles.eyeButton}>
-            <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#cbd5e0" />
+            <Ionicons name={showPassword ? 'eye' : 'eye-off'} size={20} color="#cbd5e0" />
           </TouchableOpacity>
         </View>
         {!!errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
@@ -217,12 +217,13 @@ const SignUp = () => {
         <View style={styles.row}>
           <View style={styles.half}>
             <Text style={styles.label}>Year Level</Text>
-            <View style={[styles.pickerWrapper, !!errors.yearLevel && styles.inputError]}>
+            <View style={[styles.pickerWrapper, !formData.department && styles.pickerDisabled, !!errors.yearLevel && styles.inputError]}>
               <Picker
                 selectedValue={formData.yearLevel}
                 onValueChange={val => update('yearLevel', val)}
                 style={styles.picker}
                 dropdownIconColor="#8a9bb0"
+                 enabled={!!formData.course}
               >
                 <Picker.Item label="Select Year Level" value="" color="#999" />
                 {YEAR_LEVELS.map(y => (
@@ -235,12 +236,13 @@ const SignUp = () => {
 
           <View style={styles.half}>
             <Text style={styles.label}>Block</Text>
-            <View style={[styles.pickerWrapper, !!errors.block && styles.inputError]}>
+            <View style={[styles.pickerWrapper, !formData.department && styles.pickerDisabled, !!errors.block && styles.inputError]}>
               <Picker
                 selectedValue={formData.block}
                 onValueChange={val => update('block', val)}
                 style={styles.picker}
                 dropdownIconColor="#8a9bb0"
+                 enabled={!!formData.yearLevel}
               >
                 <Picker.Item label="Select Block" value="" color="#999" />
                 {BLOCKS.map(b => (
