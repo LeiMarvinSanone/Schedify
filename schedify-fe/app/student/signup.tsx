@@ -48,7 +48,11 @@ const SignUp = () => {
     const nextErrors: Record<string, string> = {};
 
     if (!name.trim()) nextErrors.name = 'Name is required';
-    if (!email.trim()) nextErrors.email = 'Email is required';
+    if (!email.trim()) {
+      nextErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      nextErrors.email = 'Please enter a valid email address';
+    }
     if (!password.trim()) nextErrors.password = 'Password is required';
     if (!idNo.trim()) nextErrors.idNo = 'ID number is required';
     if (!department.trim()) nextErrors.department = 'Department is required';

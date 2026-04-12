@@ -47,7 +47,7 @@ export const forgotPassword = async (req, res) => {
     res.status(200).json({ message: 'Password reset email sent' });
   } catch (error) {
     console.error('forgotPassword error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -77,7 +77,7 @@ export const resetPassword = async (req, res) => {
     res.status(200).json({ message: 'Password has been reset successfully' });
   } catch (error) {
     console.error('resetPassword error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -297,7 +297,7 @@ export const googleAuth = async (req, res) => {
 
   } catch (error) {
     console.error('googleAuth error:', error);
-    res.status(401).json({ message: 'Invalid Google token', error: error.message });
+    res.status(401).json({ message: 'Invalid Google token' });
   }
 };
 
@@ -351,6 +351,6 @@ export const updatePushToken = async (req, res) => {
     res.status(200).json({ message: 'Expo push token updated successfully' });
   } catch (error) {
     console.error('updatePushToken error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
