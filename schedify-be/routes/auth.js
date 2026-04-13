@@ -1,12 +1,11 @@
 import express from 'express';
-import { register, login, changePassword, getMe, resetPassword, googleAuth, completeProfile, updatePushToken } from '../controllers/authController.js';
+import { register, login, changePassword, getMe, googleAuth, completeProfile, updatePushToken } from '../controllers/authController.js';
 import { verifyToken } from '../middleware/authmiddleware.js';
 import {
   validate,
   validateRegister,
   validateLogin,
-  validateChangePassword,
-  validateResetPassword
+  validateChangePassword
 } from '../middleware/validators.js';
 
 const router = express.Router();
@@ -22,9 +21,6 @@ router.put('/change-password', verifyToken, validateChangePassword, validate, ch
 
 // Get current user data (authenticated users only)
 router.get('/me', verifyToken, getMe);
-
-// Reset password (set new password)
-router.post('/reset-password', validateResetPassword, validate, resetPassword);
 
 // Google Auth
 router.post('/google', googleAuth);

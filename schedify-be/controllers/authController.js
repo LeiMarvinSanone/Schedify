@@ -7,36 +7,6 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_WEB_CLIENT_ID);
 
 // Register a new user (student or professor only)
 
-// Reset Password: set new password
-export const resetPassword = async (req, res) => {
-  const { email, token, newPassword } = req.body;
-  if (!email || !token || !newPassword) {
-    return res.status(400).json({ message: 'All fields are required' });
-  }
-  try {
-    const user = await User.findOne({
-      email,
-      resetPasswordToken: token,
-      resetPasswordExpires: { $gt: Date.now() },
-    });
-    if (!user) return res.status(400).json({ message: 'Invalid or expired token' });
-
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters' });
-    }
-
-    user.password = await bcrypt.hash(newPassword, 10);
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpires = undefined;
-    await user.save();
-
-    res.status(200).json({ message: 'Password has been reset successfully' });
-  } catch (error) {
-    console.error('resetPassword error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
 export const register = async (req, res) => {
   try {
     const { name, email, password, idNo, department, course, yearLevel, block, expoPushToken } = req.body;

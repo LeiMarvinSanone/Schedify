@@ -53,18 +53,6 @@ export const validateChangePassword = [
     .isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
 ];
 
-// Reset password validation
-export const validateResetPassword = [
-  body('email')
-    .notEmpty().withMessage('Email is required')
-    .isEmail().withMessage('Invalid email format'),
-  body('token')
-    .notEmpty().withMessage('Token is required'),
-  body('newPassword')
-    .notEmpty().withMessage('New password is required')
-    .isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
-];
-
 // Create schedule validation
 export const validateCreateSchedule = [
   body('type')

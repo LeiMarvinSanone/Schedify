@@ -27,10 +27,6 @@ const userSchema = new mongoose.Schema({
   googleId: { type: String }, // Google user ID
   picture: { type: String },  // Google profile picture
 
-  // For password reset
-  resetPasswordToken: { type: String },
-  resetPasswordExpires: { type: Date },
-
 }, { timestamps: true }); // automatically adds createdAt and updatedAt
 
 // Export the model
