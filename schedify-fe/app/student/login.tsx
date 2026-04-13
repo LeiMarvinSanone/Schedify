@@ -163,14 +163,6 @@ const Login = () => {
         {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
       </View>
 
-      <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'flex-end' }}>
-        <TouchableOpacity onPress={() => router.push('/student/forgot-password' as any)}>
-          <Text style={[styles.linkText, { marginTop: 8, marginBottom: 16 }]}>
-            Forgot Password?
-          </Text>
-        </TouchableOpacity>
-      </View>
-
       {/* Google Login Button */}
       {/* Login Button */}
       <TouchableOpacity

@@ -53,13 +53,6 @@ export const validateChangePassword = [
     .isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
 ];
 
-// Forgot password validation
-export const validateForgotPassword = [
-  body('email')
-    .notEmpty().withMessage('Email is required')
-    .isEmail().withMessage('Invalid email format'),
-];
-
 // Reset password validation
 export const validateResetPassword = [
   body('email')

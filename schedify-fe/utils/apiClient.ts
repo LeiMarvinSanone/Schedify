@@ -30,10 +30,6 @@ export const googleLogin = async (idToken: string): Promise<AuthResponse> => {
 export async function resetPassword(email: string, token: string, newPassword: string) {
   return await apiCall<{ message: string }>('/api/auth/reset-password', 'POST', { email, token, newPassword });
 }
-// Forgot Password API
-export async function forgotPassword(email: string) {
-  return await apiCall<{ message: string }>('/api/auth/forgot-password', 'POST', { email });
-}
 // Update Expo Push Token for logged-in user
 export async function updatePushToken(token: string): Promise<void> {
   await apiCall<{ message: string }>(

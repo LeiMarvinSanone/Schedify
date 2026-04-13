@@ -1,55 +1,11 @@
 import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
-import nodemailer from 'nodemailer';
 import { OAuth2Client } from 'google-auth-library';
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_WEB_CLIENT_ID);
 
-// Move transporter outside function (good practice)
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
 // Register a new user (student or professor only)
-// Forgot Password: send reset email
-export const forgotPassword = async (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ message: 'Email is required' });
-  const allowedDomains = ['@sorsu.edu.ph', '@gmail.com'];
-  const isAllowed = allowedDomains.some(domain => email.endsWith(domain));
-  if (!isAllowed) {
-    return res.status(400).json({ message: 'Only sorsu.edu.ph or gmail.com emails are allowed' });
-  }
-  try {
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: 'User not found' });
-
-    const token = crypto.randomBytes(32).toString('hex');
-    user.resetPasswordToken = token;
-    user.resetPasswordExpires = Date.now() + 3600000;
-    await user.save();
-
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}&email=${email}`;
-    const mailOptions = {
-      to: user.email,
-      from: process.env.EMAIL_USER,
-      subject: 'Schedify Password Reset',
-      text: `You requested a password reset. Click the link to reset your password: ${resetUrl}\nIf you did not request this, ignore this email.`
-    };
-
-    await transporter.sendMail(mailOptions);
-    res.status(200).json({ message: 'Password reset email sent' });
-  } catch (error) {
-    console.error('forgotPassword error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
 
 // Reset Password: set new password
 export const resetPassword = async (req, res) => {
