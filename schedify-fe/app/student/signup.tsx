@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { signup as apiSignup } from '../../utils/apiClient';
+import { registerForPushNotificationsAsync } from '@/utils/notifications';
 
 const COURSES: Record<string, string[]> = {
   CICT: ['BSIT', 'BSCS', 'BSIS', 'BTVTED'],
@@ -69,6 +70,7 @@ const SignUp = () => {
     try {
       await new Promise(resolve => setTimeout(resolve, 300));
       setIsLoading(true);
+      const expoPushToken = await registerForPushNotificationsAsync();
       await apiSignup({
         name: name.trim(),
         email: email.trim(),
@@ -78,6 +80,7 @@ const SignUp = () => {
         course: course.trim(),
         yearLevel: yearLevel.trim(),
         block: block.trim(),
+        expoPushToken: expoPushToken ?? undefined,
         // role removed
       });
       setErrors({});

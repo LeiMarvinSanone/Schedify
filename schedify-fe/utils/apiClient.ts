@@ -173,6 +173,7 @@ export interface SignupInput {
   yearLevel: string;
   block: string;
   role?: string;
+  expoPushToken?: string;
 }
 
 export interface AuthResponse {
