@@ -30,6 +30,9 @@ import {
   CreateScheduleInput 
 } from './apiClient';
 
+import { syncClassReminderNotifications } from './classReminderScheduler';
+import { getDefaultClassReminder, getClassReminderOverrides } from './classReminderStore';
+
 export type StoredEventType = 'class' | 'suspension' | 'event';
 
 export interface StoredCalendarEvent {
@@ -88,6 +91,7 @@ function convertScheduleToEvents(schedule: Schedule): StoredCalendarEvent[] {
         type: eventType,
         time: subject.timeRange,
         room: subject.room,
+        building: subject.building,
         department: schedule.department,
         description: `${schedule.course || ''} ${schedule.block || ''}`.trim(),
       });
@@ -115,6 +119,14 @@ export async function getPostedCalendarEvents(): Promise<StoredCalendarEvent[]> 
     schedules.forEach(schedule => {
       events.push(...convertScheduleToEvents(schedule));
     });
+    // Immediately sync reminders on fetch — don't wait for background sync
+    const [defaultReminder, overrides] = await Promise.all([
+      getDefaultClassReminder(),
+      getClassReminderOverrides(),
+    ]);
+    syncClassReminderNotifications(events, defaultReminder, overrides).catch(
+      err => console.error('Foreground reminder sync error:', err)
+    );
     
     return events;
   } catch (error) {

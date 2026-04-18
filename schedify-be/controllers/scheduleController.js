@@ -47,11 +47,12 @@ export const createSchedule = async (req, res) => {
     await newSchedule.save();
 
     // Send push notifications to relevant users
-    let query = {};
-    if (!tag || tag === 'whole-university') {
-      query = {};
-    } else {
-      query = {
+    const isWholeUniversity = !tag || tag.toLowerCase() === 'whole-university';
+    const isClassSchedule = type === 'Class Schedules';
+
+    let audienceQuery = {};
+    if (!isWholeUniversity && isClassSchedule && (course || block || yearLevel)) {
+      audienceQuery = {
         ...(course ? { course } : {}),
         ...(block ? { block } : {}),
         ...(yearLevel ? { yearLevel } : {}),
@@ -59,19 +60,25 @@ export const createSchedule = async (req, res) => {
     }
 
     const users = await User.find({
-      ...query,
-      expoPushToken: { $exists: true, $ne: null }
+      ...audienceQuery,
+      expoPushToken: { $exists: true, $ne: null, $ne: '' }
     });
 
     const tokens = users.map(u => u.expoPushToken).filter(Boolean);
 
     const now = new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' });
 
-    await sendPushNotifications(
-      tokens,
-      `New ${type}`,
-      `A new ${type.toLowerCase()} has been posted! (${now})`
-    );
+    const titleMap = {
+      'Class Schedules': '📅 New Class Schedule',
+      'Events': '🎉 New Event',
+      'Suspension': '⚠️ Class Suspension',
+    };
+    const notifTitle = titleMap[type] || `New ${type}`;
+    const notifBody = description
+      ? `${description} (${now})`
+      : `A new ${type.toLowerCase()} has been posted! (${now})`;
+
+    await sendPushNotifications(tokens, notifTitle, notifBody);
 
     res.status(201).json({ message: "Schedule created successfully", schedule: newSchedule });
 

@@ -14,6 +14,7 @@ function reminderOffsetMs(option: ReminderOption): number {
       return 0;
     case '10m':
       return 10 * 60 * 1000;
+
     case '30m':
       return 30 * 60 * 1000;
     case '1h':
@@ -102,7 +103,9 @@ export async function syncClassReminderNotifications(
   }
 
   const notificationMap = await getNotificationMap();
-  const classEvents = allEvents.filter((event) => event.type === 'class');
+  const classEvents = allEvents.filter((event) =>
+    event.type === 'class' || event.type === 'event' || event.type === 'suspension'
+  );
   const classIds = new Set(classEvents.map((event) => event.id));
 
   for (const [eventId, notifId] of Object.entries(notificationMap)) {
@@ -136,12 +139,19 @@ export async function syncClassReminderNotifications(
 
     const triggerDate = new Date(startDate.getTime() - reminderOffsetMs(reminder));
     if (triggerDate.getTime() <= Date.now()) continue;
-
+    
     const bodyParts = [event.time, event.room, event.building].filter(Boolean);
+    const titleMap: Record<string, string> = {
+      class: 'Class Reminder',
+      event: 'Event Reminder',
+      suspension: 'Suspension Notice',
+    };
+    const notifTitle = titleMap[event.type] ?? 'Reminder';
+    const notifBody = `${event.label}${bodyParts.length ? ` • ${bodyParts.join(' • ')}` : ''}`;
     const notifId = await Notifications.scheduleNotificationAsync({
       content: {
-        title: 'Class Reminder',
-        body: `${event.label}${bodyParts.length ? ` • ${bodyParts.join(' • ')}` : ''}`,
+        title: notifTitle,
+        body: notifBody,
         data: { scheduleId: event.id, type: event.type },
       },
       trigger: {
