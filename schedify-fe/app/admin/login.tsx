@@ -84,7 +84,7 @@ export default function AdminLoginScreen() {
                                     style={styles.passwordInput}
                                 />
                                 <TouchableOpacity onPress={() => setShowPassword(prev => !prev)} style={styles.eyeButton}>
-                                    <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#cbd5e0" />
+                                    <Ionicons name={showPassword ? 'eye' : 'eye-off'} size={20} color="#cbd5e0" />
                                 </TouchableOpacity>
                             </View>
                         </View>
