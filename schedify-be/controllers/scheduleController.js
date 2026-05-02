@@ -48,20 +48,21 @@ export const createSchedule = async (req, res) => {
 
     // Send push notifications to relevant users
     const isWholeUniversity = !tag || tag.toLowerCase() === 'whole-university';
-    const isClassSchedule = type === 'Class Schedules';
+
 
     let audienceQuery = {};
-    if (!isWholeUniversity && isClassSchedule && (course || block || yearLevel)) {
+    if (!isWholeUniversity && (course || block || yearLevel || department)) {
       audienceQuery = {
         ...(course ? { course } : {}),
         ...(block ? { block } : {}),
         ...(yearLevel ? { yearLevel } : {}),
+        ...(department ? { department } : {}),
       };
     }
 
     const users = await User.find({
       ...audienceQuery,
-      expoPushToken: { $exists: true, $ne: null, $ne: '' }
+      expoPushToken: { $exists: true, $nin: [null, ''] }
     });
 
     const tokens = users.map(u => u.expoPushToken).filter(Boolean);
